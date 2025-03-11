@@ -1,0 +1,459 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Base colors */
+  --background-primary: #121212;
+  --background-secondary: #1e1e1e;
+  --background-tertiary: #282828;
+  
+  /* Beer theme colors */
+  --beer-amber: #FBC02D; 
+  --copper: #D84315;
+  --copper-light: #F4511E;
+  --dark-wood: #3E2723;
+  --light-wood: #6D4C41;
+  --cream: #FFF8E1;
+  --foam: #FFECB3;
+  --beer-foam: #FFFDE7;
+  
+  /* Text colors */
+  --text-primary: rgba(255, 255, 255, 0.87);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  
+  /* Glass effect */
+  --glass-background: rgba(42, 39, 35, 0.75);
+  --glass-border: rgba(251, 192, 45, 0.3);
+  --glass-shadow: rgba(0, 0, 0, 0.2);
+  
+  /* Border radius */
+  --border-radius: 12px;
+  
+  /* Font */
+  --font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+
+  --max-width: 1100px;
+  --font-mono: ui-monospace, Menlo, Monaco, 'Cascadia Mono', 'Segoe UI Mono',
+    'Roboto Mono', 'Oxygen Mono', 'Ubuntu Monospace', 'Source Code Pro',
+    'Fira Mono', 'Droid Sans Mono', 'Courier New', monospace;
+
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
+
+  --primary-glow: radial-gradient(rgba(1, 65, 255, 0.4), rgba(1, 65, 255, 0));
+  --secondary-glow: linear-gradient(
+    to bottom right,
+    rgba(1, 65, 255, 0),
+    rgba(1, 65, 255, 0),
+    rgba(1, 65, 255, 0.3)
+  );
+
+  --tile-start-rgb: 2, 13, 46;
+  --tile-end-rgb: 2, 5, 19;
+  --tile-border: conic-gradient(
+    #ffffff80,
+    #ffffff40,
+    #ffffff30,
+    #ffffff20,
+    #ffffff10,
+    #ffffff10,
+    #ffffff80
+  );
+
+  --callout-rgb: 20, 20, 20;
+  --callout-border-rgb: 108, 108, 108;
+  --card-rgb: 100, 100, 100;
+  --card-border-rgb: 200, 200, 200;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  background: linear-gradient(to bottom, var(--dark-wood), #121212);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Modern frosted glass card */
+.glass-card {
+  background: var(--glass-background) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 32px 0 var(--glass-shadow) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Form inputs */
+.MuiInputBase-root {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
+  color: var(--text-primary) !important;
+}
+
+.MuiInputLabel-root {
+  color: var(--text-secondary) !important;
+}
+
+.MuiInputBase-root.Mui-focused {
+  border-color: var(--beer-amber) !important;
+}
+
+.MuiInputLabel-root.Mui-focused {
+  color: var(--beer-amber) !important;
+}
+
+.MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--beer-amber) !important;
+}
+
+/* Select menus */
+.MuiSelect-select {
+  color: var(--text-primary) !important;
+}
+
+.MuiMenuItem-root {
+  color: var(--text-primary) !important;
+}
+
+.MuiPaper-root {
+  background-color: var(--glass-background) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Logo text */
+.logo-text {
+  font-family: var(--font-family);
+  font-weight: 700 !important;
+  background: linear-gradient(to right, var(--beer-amber), var(--copper));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  letter-spacing: 1px;
+}
+
+/* Beer bubbles background */
+.bubble {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
+  box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.3);
+  z-index: 0;
+}
+
+/* Modern scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--beer-amber);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--copper);
+}
+
+/* Map styles */
+.mapboxgl-map {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 1 !important;
+}
+
+.mapboxgl-canvas-container,
+.mapboxgl-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Custom beer marker */
+.beer-marker {
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.beer-marker:hover {
+  transform: scale(1.2);
+}
+
+/* Pour animation for markers */
+.beer-marker.new {
+  animation: gentle-pulse 1s ease-in-out;
+}
+
+.beer-marker.new::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  width: 4px;
+  height: 20px;
+  background: var(--beer-amber);
+  animation: pour 1.5s ease-in-out infinite;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Beer popup styles */
+.beer-popup .mapboxgl-popup-content {
+  background: var(--glass-background) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+  border-radius: 8px !important;
+  padding: 10px !important;
+}
+
+.beer-popup .mapboxgl-popup-close-button {
+  color: var(--text-primary) !important;
+  font-size: 16px !important;
+  padding: 5px !important;
+}
+
+.beer-popup .mapboxgl-popup-tip {
+  border-top-color: var(--glass-background) !important;
+  border-bottom-color: var(--glass-background) !important;
+}
+
+/* Animations */
+@keyframes gentle-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-800px);
+    opacity: 0;
+  }
+}
+
+@keyframes pour {
+  0% { transform: translateY(-20px) rotate(-45deg); opacity: 0; }
+  50% { transform: translateY(0) rotate(-45deg); opacity: 1; }
+  100% { transform: translateY(20px) rotate(-45deg); opacity: 0; }
+}
+
+/* Ensure all main content pages have proper padding and background */
+.main-content {
+  min-height: 100vh;
+  padding-top: 80px; /* Account for navbar */
+  background: linear-gradient(to bottom, var(--dark-wood), #121212);
+  color: var(--text-primary);
+}
+
+/* Ensure text is always readable */
+.text-content {
+  color: var(--text-primary) !important;
+}
+
+/* Fix scrollbar issues */
+.map-container {
+  height: calc(100vh - 180px) !important;
+  overflow: hidden !important;
+  border-radius: 16px;
+}
+
+/* Premium card with gradient border */
+.premium-card {
+  background: linear-gradient(135deg,
+    rgba(62, 39, 35, 0.2) 0%,
+    rgba(251, 192, 45, 0.1) 100%) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 16px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  backdrop-filter: blur(10px) !important;
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 0 32px rgba(251, 192, 45, 0.02) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.premium-card::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  border-radius: 16px !important;
+  padding: 1px !important;
+  background: linear-gradient(135deg, var(--beer-amber), var(--copper)) !important;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0) !important;
+  mask-composite: exclude !important;
+  pointer-events: none !important;
+}
+
+.premium-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    inset 0 0 32px rgba(251, 192, 45, 0.05) !important;
+}
+
+/* Enhanced stat card */
+.stat-card {
+  background: var(--glass-background) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 16px !important;
+  padding: 24px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 12px !important;
+  text-align: center !important;
+  transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 0 32px rgba(251, 192, 45, 0.02) !important;
+}
+
+.stat-card:hover {
+  transform: scale(1.02) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    inset 0 0 32px rgba(251, 192, 45, 0.05) !important;
+}
+
+.stat-value {
+  font-size: 2.5rem !important;
+  font-weight: 700 !important;
+  background: linear-gradient(to right, var(--beer-amber), var(--copper)) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  margin-bottom: 8px !important;
+}
+
+.stat-label {
+  color: var(--text-secondary) !important;
+  font-size: 1rem !important;
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+}
+
+/* Enhanced drink card */
+.drink-card {
+  background: linear-gradient(135deg,
+    rgba(62, 39, 35, 0.2) 0%,
+    rgba(251, 192, 45, 0.1) 100%) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 16px !important;
+  padding: 20px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 0 32px rgba(251, 192, 45, 0.02) !important;
+}
+
+.drink-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    inset 0 0 32px rgba(251, 192, 45, 0.05) !important;
+}
+
+/* Friend card */
+.friend-card {
+  background: var(--glass-background) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 0 32px rgba(251, 192, 45, 0.02) !important;
+}
+
+.friend-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    inset 0 0 32px rgba(251, 192, 45, 0.05) !important;
+}
+
+/* Page transitions */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 400ms ease-in-out, transform 400ms ease-in-out;
+}
+
+.page-transition-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 300ms ease-in-out, transform 300ms ease-in-out;
+}
+
+/* Enhanced scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-primary);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, var(--beer-amber), var(--copper));
+  border-radius: 5px;
+  border: 2px solid var(--background-primary);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, var(--copper-light), var(--copper));
+} 

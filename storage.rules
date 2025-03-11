@@ -1,0 +1,18 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /profile-pictures/{userId} {
+      // Anyone can view profile pictures
+      allow read: if true;
+      
+      // Only the user can upload their own profile picture
+      allow write, delete: if request.auth != null 
+        && request.auth.uid == userId
+        && (resource == null || request.resource == null || (
+          request.resource.size < 1024 * 1024  // Max 1MB
+          && request.resource.contentType.matches('image/.*')
+        ));
+    }
+  }
+} 

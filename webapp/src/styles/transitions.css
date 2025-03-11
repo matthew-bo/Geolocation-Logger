@@ -1,0 +1,98 @@
+/* Page transitions */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 400ms ease-in-out, transform 400ms ease-in-out;
+}
+
+.page-transition-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 300ms ease-in-out, transform 300ms ease-in-out;
+}
+
+/* Navigation transitions */
+.nav-fade-enter {
+  opacity: 0;
+}
+
+.nav-fade-enter-active {
+  opacity: 1;
+  transition: opacity 200ms ease-in-out;
+}
+
+.nav-fade-exit {
+  opacity: 1;
+}
+
+.nav-fade-exit-active {
+  opacity: 0;
+  transition: opacity 200ms ease-in-out;
+}
+
+/* Button hover and active states */
+.button-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.button-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.button-hover:active {
+  transform: translateY(1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Loading transitions */
+.loading-fade-enter {
+  opacity: 0;
+}
+
+.loading-fade-enter-active {
+  opacity: 1;
+  transition: opacity 200ms ease-in-out;
+}
+
+.loading-fade-exit {
+  opacity: 1;
+}
+
+.loading-fade-exit-active {
+  opacity: 0;
+  transition: opacity 200ms ease-in-out;
+}
+
+/* Form field transitions */
+.form-field-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.form-field-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms ease-in-out, transform 300ms ease-in-out;
+}
+
+.form-field-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.form-field-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 300ms ease-in-out, transform 300ms ease-in-out;
+} 

@@ -129,13 +129,12 @@ export default function MapView() {
   const [selectedDrink, setSelectedDrink] = useState(null);
   const [cursorCoords, setCursorCoords] = useState(null);
   const [filters, setFilters] = useState({
-    drinkName: '',
+    drinkType: 'all',
     container: '',
+    brand: '',
     rating: '',
     startDate: null,
     endDate: null,
-    timeRange: 7,
-    drinkType: 'all',
   });
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [selectedLocationDrink, setSelectedLocationDrink] = useState(null);
@@ -212,28 +211,24 @@ export default function MapView() {
 
   const fetchFriends = async () => {
     try {
-      // Use a direct pattern query for friendships
-      const friendshipsQuery = query(
-        collection(db, 'friendships'),
-        where('userId', '==', user.uid)
-      );
+      // Get all drinks from users who are currently friends
+      const friendsSnapshot = await getDocs(collection(db, 'users'));
+      const allUsers = friendsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      const friendsSnapshot = await getDocs(friendshipsQuery);
-      const friendIds = friendsSnapshot.docs.map(doc => doc.data().friendId);
+      // Filter out the current user
+      const otherUsers = allUsers.filter(user => user.id !== user.uid);
       
-      // Fetch friend drinks
-      if (friendIds.length > 0 && showFriendDrinks) {
-        const friendDrinksPromises = friendIds.map(async (friendId) => {
-          if (selectedFriends.length === 0 || selectedFriends.includes(friendId)) {
-            const q = query(collection(db, 'drinks'), where('userId', '==', friendId));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => ({ 
-              id: doc.id, 
-              ...doc.data(), 
-              friendId 
-            }));
-          }
-          return [];
+      // Fetch drinks for all users except current user
+      if (otherUsers.length > 0 && showFriendDrinks) {
+        const friendDrinksPromises = otherUsers.map(async (friend) => {
+          const q = query(collection(db, 'drinks'), where('userId', '==', friend.id));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data(), 
+            friendId: friend.id,
+            friendUsername: friend.username || friend.displayName || 'Anonymous Beer Lover'
+          }));
         });
         
         const allFriendDrinks = await Promise.all(friendDrinksPromises);
@@ -255,13 +250,12 @@ export default function MapView() {
 
   const clearFilters = () => {
     setFilters({
-      drinkName: '',
+      drinkType: 'all',
       container: '',
+      brand: '',
       rating: '',
       startDate: null,
       endDate: null,
-      timeRange: 7,
-      drinkType: 'all',
     });
   };
 
@@ -390,12 +384,27 @@ export default function MapView() {
       return false;
     }
     
-    // Filter by date range
-    if (filters.startDate && drink.timestamp && drink.timestamp < filters.startDate) {
+    // Filter by container type
+    if (filters.container && drink.containerType !== filters.container) {
+      return false;
+    }
+
+    // Filter by brand
+    if (filters.brand && !drink.brand?.toLowerCase().includes(filters.brand.toLowerCase())) {
+      return false;
+    }
+
+    // Filter by rating
+    if (filters.rating && drink.rating < parseInt(filters.rating)) {
       return false;
     }
     
-    if (filters.endDate && drink.timestamp && drink.timestamp > filters.endDate) {
+    // Filter by date range
+    if (filters.startDate && drink.timestamp && new Date(drink.timestamp) < filters.startDate) {
+      return false;
+    }
+    
+    if (filters.endDate && drink.timestamp && new Date(drink.timestamp) > filters.endDate) {
       return false;
     }
     
@@ -408,11 +417,23 @@ export default function MapView() {
       return false;
     }
     
-    if (filters.startDate && drink.timestamp && drink.timestamp < filters.startDate) {
+    if (filters.container && drink.containerType !== filters.container) {
+      return false;
+    }
+
+    if (filters.brand && !drink.brand?.toLowerCase().includes(filters.brand.toLowerCase())) {
+      return false;
+    }
+
+    if (filters.rating && drink.rating < parseInt(filters.rating)) {
       return false;
     }
     
-    if (filters.endDate && drink.timestamp && drink.timestamp > filters.endDate) {
+    if (filters.startDate && drink.timestamp && new Date(drink.timestamp) < filters.startDate) {
+      return false;
+    }
+    
+    if (filters.endDate && drink.timestamp && new Date(drink.timestamp) > filters.endDate) {
       return false;
     }
     
@@ -505,6 +526,7 @@ export default function MapView() {
           <MapControls>
             <Typography variant="h6" gutterBottom>Map Controls</Typography>
             
+            {/* Date Range Filter */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" gutterBottom color="var(--text-secondary)">
                 Date Range
@@ -526,7 +548,43 @@ export default function MapView() {
                 </Box>
               </LocalizationProvider>
             </Box>
+
+            {/* Container Type Filter */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" gutterBottom color="var(--text-secondary)">
+                Container Type
+              </Typography>
+              <FormControl fullWidth size="small">
+                <Select
+                  value={filters.container}
+                  onChange={(e) => handleFilterChange('container', e.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="">All Containers</MenuItem>
+                  {containerTypes.map((type) => (
+                    <MenuItem key={type} value={type}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+
+            {/* Brand Filter */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" gutterBottom color="var(--text-secondary)">
+                Brand
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search by brand"
+                value={filters.brand || ''}
+                onChange={(e) => handleFilterChange('brand', e.target.value)}
+              />
+            </Box>
             
+            {/* Drink Type Filter */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" gutterBottom color="var(--text-secondary)">
                 Drink Type
@@ -538,15 +596,39 @@ export default function MapView() {
                   displayEmpty
                 >
                   <MenuItem value="all">All Types</MenuItem>
-                  <MenuItem value="beer">Beer</MenuItem>
-                  <MenuItem value="wine">Wine</MenuItem>
-                  <MenuItem value="cocktail">Cocktail</MenuItem>
-                  <MenuItem value="spirits">Spirits</MenuItem>
+                  <MenuItem value="lager">Lager</MenuItem>
+                  <MenuItem value="ale">Ale</MenuItem>
+                  <MenuItem value="ipa">IPA</MenuItem>
+                  <MenuItem value="stout">Stout</MenuItem>
+                  <MenuItem value="porter">Porter</MenuItem>
+                  <MenuItem value="wheat">Wheat</MenuItem>
                   <MenuItem value="other">Other</MenuItem>
                 </Select>
               </FormControl>
             </Box>
-            
+
+            {/* Rating Filter */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" gutterBottom color="var(--text-secondary)">
+                Minimum Rating
+              </Typography>
+              <FormControl fullWidth size="small">
+                <Select
+                  value={filters.rating}
+                  onChange={(e) => handleFilterChange('rating', e.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="">Any Rating</MenuItem>
+                  <MenuItem value="5">5 Stars</MenuItem>
+                  <MenuItem value="4">4+ Stars</MenuItem>
+                  <MenuItem value="3">3+ Stars</MenuItem>
+                  <MenuItem value="2">2+ Stars</MenuItem>
+                  <MenuItem value="1">1+ Star</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
+            {/* Friends Filter */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" gutterBottom color="var(--text-secondary)">
                 Show Friends' Drinks
@@ -569,57 +651,57 @@ export default function MapView() {
                 label="Show Friends"
               />
             </Box>
-            
+
+            {/* Map Legend */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" gutterBottom color="var(--text-secondary)">
-                Marker Size by Hour
+                Map Legend
               </Typography>
-              <FormControlLabel
-                control={
-                  <Switch 
-                    checked={markerSizeByTimeOfDay}
-                    onChange={(e) => setMarkerSizeByTimeOfDay(e.target.checked)}
-                    sx={{
-                      '& .MuiSwitch-switchBase.Mui-checked': {
-                        color: 'var(--beer-amber)',
-                      },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                        backgroundColor: 'var(--beer-amber)',
-                      },
-                    }}
-                  />
-                }
-                label="Time-based Size"
-              />
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#F9A825' }} />
+                  <Typography variant="body2">Lager</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#D84315' }} />
+                  <Typography variant="body2">Ale</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#EF6C00' }} />
+                  <Typography variant="body2">IPA</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#3E2723' }} />
+                  <Typography variant="body2">Stout</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4E342E' }} />
+                  <Typography variant="body2">Porter</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FFD54F' }} />
+                  <Typography variant="body2">Wheat</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FBC02D' }} />
+                  <Typography variant="body2">Other</Typography>
+                </Box>
+              </Box>
             </Box>
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-              <Button
-                variant="outlined"
-                onClick={clearFilters}
-                sx={{ 
-                  borderColor: 'var(--beer-amber)', 
-                  color: 'var(--beer-amber)',
-                  '&:hover': { borderColor: 'var(--copper)', background: 'rgba(255,255,255,0.03)' }
-                }}
-                startIcon={<FilterIcon />}
-              >
-                Clear Filters
-              </Button>
-              
-              <Button
-                variant="outlined"
-                onClick={() => handleExport('excel')}
-                sx={{ 
-                  borderColor: 'var(--beer-amber)', 
-                  color: 'var(--beer-amber)',
-                  '&:hover': { borderColor: 'var(--copper)', background: 'rgba(255,255,255,0.03)' }
-                }}
-                startIcon={<DownloadIcon />}
-              >
-                Export
-              </Button>
-            </Box>
+
+            <Button
+              variant="outlined"
+              onClick={clearFilters}
+              fullWidth
+              sx={{ 
+                borderColor: 'var(--beer-amber)', 
+                color: 'var(--beer-amber)',
+                '&:hover': { borderColor: 'var(--copper)', background: 'rgba(255,255,255,0.03)' }
+              }}
+              startIcon={<FilterIcon />}
+            >
+              Clear Filters
+            </Button>
           </MapControls>
         </Box>
       )}

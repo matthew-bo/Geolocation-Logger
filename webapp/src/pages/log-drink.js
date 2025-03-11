@@ -39,16 +39,13 @@ const BeerRating = styled(Rating)({
   },
 });
 
-// Fun pint size descriptions
-const PINT_SIZES = [
-  { value: 0.5, label: 'Just a Taste (½ Pint)' },
-  { value: 1, label: 'Classic Pint' },
-  { value: 1.5, label: 'Tall Boy (1½ Pints)' },
-  { value: 2, label: 'Double Fister (2 Pints)' },
-  { value: 2.5, label: 'Thirsty Thursday (2½ Pints)' },
-  { value: 3, label: 'Weekend Warrior (3 Pints)' },
-  { value: 3.5, label: 'Challenge Accepted (3½ Pints)' },
-  { value: 4, label: 'Legend Status (4 Pints)' },
+// Beer size options
+const BEER_SIZES = [
+  { value: 12, label: 'Standard (12 oz)' },
+  { value: 16, label: 'Guinness (16 oz)' },
+  { value: 18, label: 'Mid-West Tall Boy (18 oz)' },
+  { value: 24, label: 'Tall Boy (24 oz)' },
+  { value: 0, label: 'Other' },
 ];
 
 // Bubble component reused from index page
@@ -73,11 +70,12 @@ export default function LogDrink() {
   const [loading, setLoading] = useState(false);
   const [previousBrands, setPreviousBrands] = useState([]);
   const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [customAmount, setCustomAmount] = useState('');
   const [formData, setFormData] = useState({
     brand: '',
     drinkType: '',
     containerType: '',
-    amount: 1,
+    amount: 12, // Default to standard size
     rating: 0,
     notes: '',
   });
@@ -348,6 +346,25 @@ export default function LogDrink() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleAmountChange = (event) => {
+    const selectedValue = event.target.value;
+    if (selectedValue === 0) {
+      // If "Other" is selected, don't update the amount yet
+      setFormData(prev => ({ ...prev, amount: 0 }));
+    } else {
+      setFormData(prev => ({ ...prev, amount: selectedValue }));
+      setCustomAmount(''); // Clear custom amount when selecting a preset size
+    }
+  };
+
+  const handleCustomAmountChange = (event) => {
+    const value = event.target.value;
+    setCustomAmount(value);
+    if (value && !isNaN(value)) {
+      setFormData(prev => ({ ...prev, amount: Number(value) }));
+    }
+  };
+
   return (
     <Box
       sx={{
@@ -456,29 +473,32 @@ export default function LogDrink() {
             </Select>
           </FormControl>
 
-          <Box sx={{ mb: 3 }}>
-            <Typography gutterBottom>Amount</Typography>
-            <FormControl fullWidth>
-              <Select
-                name="amount"
-                value={formData.amount}
-                onChange={handleChange}
-                sx={{
-                  background: 'var(--glass-background)',
-                  backdropFilter: 'blur(10px)',
-                }}
-              >
-                {PINT_SIZES.map(size => (
-                  <MenuItem key={size.value} value={size.value}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <PintIcon sx={{ mr: 1, color: 'var(--beer-amber)' }} />
-                      {size.label}
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Amount</InputLabel>
+            <Select
+              value={formData.amount === 0 ? 0 : formData.amount}
+              onChange={handleAmountChange}
+              label="Amount"
+            >
+              {BEER_SIZES.map((size) => (
+                <MenuItem key={size.value} value={size.value}>
+                  {size.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {formData.amount === 0 && (
+            <TextField
+              fullWidth
+              sx={{ mt: 2 }}
+              label="Custom Amount (oz)"
+              type="number"
+              value={customAmount}
+              onChange={handleCustomAmountChange}
+              InputProps={{ inputProps: { min: 1 } }}
+            />
+          )}
 
           <Box sx={{ mb: 3, textAlign: 'center' }}>
             <Typography gutterBottom>Rating</Typography>

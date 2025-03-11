@@ -203,8 +203,7 @@ export default function CreateGroupDialog({ open, onClose, onGroupCreated }) {
                   />
                 </ListItemIcon>
                 <ListItemText 
-                  primary={friend.username || friend.email?.split('@')[0]}
-                  secondary={friend.email}
+                  primary={friend.username || friend.displayName || 'Anonymous Beer Lover'}
                 />
               </ListItem>
             ))}

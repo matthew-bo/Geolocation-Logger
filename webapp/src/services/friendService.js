@@ -42,10 +42,9 @@ class FriendService {
       // Exclude users with pending requests (but not rejected ones)
       if (pendingRequestIds.has(user.id)) return false;
       
-      // Search by username, email, or display name
+      // Search by username or display name only
       return (
         user.username?.toLowerCase().includes(searchTermLower) ||
-        user.email?.toLowerCase().includes(searchTermLower) ||
         user.displayName?.toLowerCase().includes(searchTermLower) ||
         `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchTermLower)
       );
@@ -76,7 +75,6 @@ class FriendService {
       senderId,
       receiverId,
       senderUsername: senderData.username || senderData.displayName || '',
-      senderEmail: senderData.email || '',
       senderPhotoURL: senderData.photoURL || '',
       status: 'pending',
       createdAt: serverTimestamp()

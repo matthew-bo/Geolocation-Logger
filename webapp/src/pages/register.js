@@ -30,26 +30,13 @@ export default function Register() {
 
   const onSubmit = async (data) => {
     setLoading(true);
-    try {
-      const result = await registerUser({
-        username: data.username,
-        email: data.email,
-        password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
-      });
-      
-      if (!result.success) {
-        console.error("Registration failed:", result.message);
-        toast.error(result.message);
-      } else {
-        toast.success("Account created successfully!");
-      }
-    } catch (error) {
-      console.error("Registration error:", error);
-      toast.error(`Error creating account: ${error.message || "Unknown error"}`);
-    } finally {
-      setLoading(false);
+    const result = await register(data.email, data.password, data.username);
+    setLoading(false);
+
+    if (!result.success) {
+      toast.error(result.message);
+    } else {
+      router.push('/');
     }
   };
 

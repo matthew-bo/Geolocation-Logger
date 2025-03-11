@@ -265,11 +265,10 @@ export default function Friends() {
                       src={friend.photoURL}
                       sx={{ mr: 2, bgcolor: 'var(--beer-amber)' }}
                     >
-                      {friend.username?.[0]?.toUpperCase() || friend.email?.[0]?.toUpperCase()}
+                      {friend.username?.[0]?.toUpperCase() || friend.displayName?.[0]?.toUpperCase() || '?'}
                     </Avatar>
                     <ListItemText
-                      primary={friend.username || friend.displayName || friend.email}
-                      secondary={friend.email}
+                      primary={friend.username || friend.displayName || 'Anonymous Beer Lover'}
                     />
                     <ListItemSecondaryAction>
                       <IconButton
@@ -302,7 +301,7 @@ export default function Friends() {
                 <TextField
                   fullWidth
                   variant="outlined"
-                  placeholder="Search users by name or email"
+                  placeholder="Search users by username"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   InputProps={{
@@ -318,6 +317,52 @@ export default function Friends() {
                   }}
                 />
                 <List>
+                  {friends.map((friend) => (
+                    <ListItem
+                      key={friend.id}
+                      button
+                      onClick={() => handleViewProfile(friend.id)}
+                      sx={{
+                        borderBottom: '1px solid var(--border-color)',
+                        '&:last-child': { borderBottom: 'none' },
+                      }}
+                    >
+                      <Avatar
+                        src={friend.photoURL}
+                        sx={{ mr: 2, bgcolor: 'var(--beer-amber)' }}
+                      >
+                        {friend.username?.[0]?.toUpperCase() || friend.displayName?.[0]?.toUpperCase() || '?'}
+                      </Avatar>
+                      <ListItemText
+                        primary={friend.username || friend.displayName || 'Anonymous Beer Lover'}
+                      />
+                      <ListItemSecondaryAction>
+                        <IconButton
+                          edge="end"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveFriend(friend.id);
+                          }}
+                          sx={{ color: 'var(--text-secondary)' }}
+                        >
+                          <RemoveIcon />
+                        </IconButton>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                  ))}
+                  {friends.length === 0 && (
+                    <ListItem>
+                      <ListItemText
+                        primary="No friends yet"
+                        secondary="Add some friends to see their beer journey!"
+                        sx={{ textAlign: 'center', color: 'var(--text-secondary)' }}
+                      />
+                    </ListItem>
+                  )}
+                </List>
+
+                {/* Search Results */}
+                <List>
                   {searchResults.map((result) => (
                     <ListItem
                       key={result.id}
@@ -330,11 +375,10 @@ export default function Friends() {
                         src={result.photoURL}
                         sx={{ mr: 2, bgcolor: 'var(--beer-amber)' }}
                       >
-                        {result.username?.[0]?.toUpperCase() || result.email?.[0]?.toUpperCase()}
+                        {result.username?.[0]?.toUpperCase() || result.displayName?.[0]?.toUpperCase() || '?'}
                       </Avatar>
                       <ListItemText
-                        primary={result.username || result.displayName || result.email}
-                        secondary={result.email}
+                        primary={result.username || result.displayName || 'Anonymous Beer Lover'}
                       />
                       <ListItemSecondaryAction>
                         <IconButton
@@ -347,15 +391,6 @@ export default function Friends() {
                       </ListItemSecondaryAction>
                     </ListItem>
                   ))}
-                  {searchTerm.length >= 2 && searchResults.length === 0 && (
-                    <ListItem>
-                      <ListItemText
-                        primary="No users found"
-                        secondary="Try a different search term"
-                        sx={{ textAlign: 'center', color: 'var(--text-secondary)' }}
-                      />
-                    </ListItem>
-                  )}
                 </List>
               </Box>
             )}
@@ -374,11 +409,11 @@ export default function Friends() {
                       src={request.senderPhotoURL}
                       sx={{ mr: 2, bgcolor: 'var(--beer-amber)' }}
                     >
-                      {request.senderUsername?.[0]?.toUpperCase() || request.senderEmail?.[0]?.toUpperCase()}
+                      {request.senderUsername?.[0]?.toUpperCase() || '?'}
                     </Avatar>
                     <ListItemText
-                      primary={request.senderUsername || request.senderEmail}
-                      secondary={request.senderEmail}
+                      primary={request.senderUsername || 'Anonymous Beer Lover'}
+                      secondary={request.createdAt ? new Date(request.createdAt.seconds * 1000).toLocaleString() : ''}
                     />
                     <ListItemSecondaryAction>
                       <IconButton

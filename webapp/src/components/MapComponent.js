@@ -244,6 +244,11 @@ export default function MapComponent({
             onClose={() => setSelectedDrink(null)}
             closeButton={true}
             closeOnClick={false}
+            closeButtonProps={{
+              'aria-hidden': false,
+              tabIndex: 0,
+              'aria-label': 'Close popup'
+            }}
             className="beer-popup"
           >
             <Box sx={{ p: 1 }}>

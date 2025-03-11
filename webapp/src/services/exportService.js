@@ -5,6 +5,53 @@ import { utils, write } from 'xlsx';
  */
 const exportService = {
   /**
+   * Safely convert any timestamp format to a valid date string
+   * @param {*} timestamp - Timestamp in any format
+   * @returns {string} Formatted date string or 'N/A'
+   */
+  safeFormatTimestamp(timestamp) {
+    try {
+      if (!timestamp) return 'N/A';
+      
+      let date;
+      
+      // Handle Firestore Timestamp
+      if (typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      }
+      // Handle seconds timestamp
+      else if (timestamp._seconds) {
+        date = new Date(timestamp._seconds * 1000);
+      }
+      // Handle ISO string
+      else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      }
+      // Handle Date object
+      else if (timestamp instanceof Date) {
+        date = timestamp;
+      }
+      // Handle number (unix timestamp)
+      else if (typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      }
+      else {
+        return 'N/A';
+      }
+
+      // Validate the date
+      if (isNaN(date.getTime())) {
+        return 'N/A';
+      }
+
+      return date.toISOString();
+    } catch (error) {
+      console.warn('Error formatting timestamp:', error);
+      return 'N/A';
+    }
+  },
+
+  /**
    * Export data to Excel format
    * @param {Array} drinks - Array of drink objects to export
    * @param {string} filename - Filename for the exported file
@@ -26,19 +73,9 @@ const exportService = {
       // Convert drinks to worksheet format
       const wsData = drinks.map(drink => {
         // Format timestamp components
-        let date = 'N/A';
-        let time = 'N/A';
-        let timestamp = 'N/A';
-        
-        if (drink.timestamp) {
-          const drinkDate = new Date(drink.timestamp.seconds * 1000);
-          // Full ISO timestamp
-          timestamp = drinkDate.toISOString();
-          // Format date as YYYY-MM-DD
-          date = drinkDate.toISOString().split('T')[0];
-          // Format time as HH:MM:SS
-          time = drinkDate.toTimeString().split(' ')[0];
-        }
+        const timestamp = this.safeFormatTimestamp(drink.timestamp);
+        const date = timestamp !== 'N/A' ? timestamp.split('T')[0] : 'N/A';
+        const time = timestamp !== 'N/A' ? timestamp.split('T')[1].split('.')[0] : 'N/A';
         
         // Format location
         const lat = drink.location?.lat || drink.location?.coordinates?.[1] || 'N/A';
@@ -101,19 +138,9 @@ const exportService = {
       // Format data
       const formattedData = data.map(drink => {
         // Format timestamp components
-        let date = 'N/A';
-        let time = 'N/A';
-        let timestamp = 'N/A';
-        
-        if (drink.timestamp) {
-          const drinkDate = new Date(drink.timestamp.seconds * 1000);
-          // Full ISO timestamp
-          timestamp = drinkDate.toISOString();
-          // Format date as YYYY-MM-DD
-          date = drinkDate.toISOString().split('T')[0];
-          // Format time as HH:MM:SS
-          time = drinkDate.toTimeString().split(' ')[0];
-        }
+        const timestamp = this.safeFormatTimestamp(drink.timestamp);
+        const date = timestamp !== 'N/A' ? timestamp.split('T')[0] : 'N/A';
+        const time = timestamp !== 'N/A' ? timestamp.split('T')[1].split('.')[0] : 'N/A';
         
         // Format location
         const lat = drink.location?.lat || drink.location?.coordinates?.[1] || 'N/A';
@@ -177,19 +204,9 @@ const exportService = {
       // Format data to be more readable
       const formattedData = data.map(drink => {
         // Format timestamp components
-        let date = null;
-        let time = null;
-        let timestamp = null;
-        
-        if (drink.timestamp) {
-          const drinkDate = new Date(drink.timestamp.seconds * 1000);
-          // Full ISO timestamp
-          timestamp = drinkDate.toISOString();
-          // Format date as YYYY-MM-DD
-          date = drinkDate.toISOString().split('T')[0];
-          // Format time as HH:MM:SS
-          time = drinkDate.toTimeString().split(' ')[0];
-        }
+        const timestamp = this.safeFormatTimestamp(drink.timestamp);
+        const date = timestamp !== 'N/A' ? timestamp.split('T')[0] : null;
+        const time = timestamp !== 'N/A' ? timestamp.split('T')[1].split('.')[0] : null;
         
         // Format location
         const location = {};
@@ -207,7 +224,7 @@ const exportService = {
           rating: drink.rating || null,
           date: date,
           time: time,
-          timestamp: timestamp,
+          timestamp: timestamp !== 'N/A' ? timestamp : null,
           location: drink.location ? location : null,
           notes: drink.notes || null,
         };

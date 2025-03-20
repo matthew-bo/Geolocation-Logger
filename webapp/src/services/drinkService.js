@@ -9,7 +9,8 @@ import {
   setDoc,
   updateDoc,
   arrayUnion,
-  orderBy
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -121,6 +122,115 @@ export const drinkService = {
     } catch (error) {
       console.error('Error exporting drinks:', error);
       throw error;
+    }
+  },
+
+  // Quick log last drink
+  async quickLogLastDrink(userId) {
+    try {
+      // Get last drink
+      const q = query(
+        collection(db, 'drinks'),
+        where('userId', '==', userId),
+        orderBy('timestamp', 'desc'),
+        limit(1)
+      );
+      
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        return {
+          success: false,
+          message: 'No previous drinks found. Please log a drink first.'
+        };
+      }
+
+      const lastDrink = snapshot.docs[0].data();
+      
+      // Get current location and place info
+      let location = lastDrink.location;
+      let placeInfo = lastDrink.placeInfo;
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+        
+        location = {
+          coordinates: [position.coords.longitude, position.coords.latitude]
+        };
+
+        // Get place info for the new location
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}`
+        );
+        const data = await response.json();
+        
+        placeInfo = {
+          address: data.display_name,
+          city: data.address.city || data.address.town || data.address.village,
+          state: data.address.state,
+          country: data.address.country,
+          neighborhood: data.address.suburb || data.address.neighbourhood,
+          placeName: data.name || data.display_name.split(',')[0]
+        };
+      } catch (error) {
+        console.warn('Using last drink location due to geolocation error:', error);
+      }
+
+      // Create new drink with current timestamp and location
+      const newDrink = {
+        ...lastDrink,
+        timestamp: new Date(),
+        location,
+        placeInfo
+      };
+
+      // Add new drink
+      const docRef = await addDoc(collection(db, 'drinks'), newDrink);
+
+      // Update user's previous drinks
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        // Create user document if it doesn't exist
+        await setDoc(userRef, {
+          previousDrinks: [newDrink.drinkName],
+          createdAt: new Date().toISOString()
+        });
+      } else {
+        // Update existing user's previous drinks
+        await updateDoc(userRef, {
+          previousDrinks: arrayUnion(newDrink.drinkName)
+        });
+      }
+
+      return {
+        success: true,
+        message: '🍺 Drink logged successfully!',
+        drinkId: docRef.id
+      };
+    } catch (error) {
+      console.error('Error quick logging drink:', error);
+      return {
+        success: false,
+        message: this.getErrorMessage(error)
+      };
+    }
+  },
+
+  // Error message handler
+  getErrorMessage(error) {
+    switch (error.code) {
+      case 'permission-denied':
+        return 'Location access denied. Please enable location services to log drinks.';
+      case 'position-unavailable':
+        return 'Unable to get current location. Using last known location.';
+      case 'timeout':
+        return 'Location request timed out. Please try again.';
+      case 'not-found':
+        return 'No previous drinks found. Please log a drink first.';
+      default:
+        return error.message || 'An unexpected error occurred. Please try again.';
     }
   }
 }; 

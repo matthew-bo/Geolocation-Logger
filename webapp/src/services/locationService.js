@@ -1,5 +1,5 @@
 import { db } from '../config/firebase';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, collection, setDoc, getDocs, deleteDoc } from 'firebase/firestore';
 
 // Mapbox token from env variables
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -7,9 +7,10 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 /**
  * Get a meaningful display name for a location
  * @param {Object} drink - Drink object with location data
+ * @param {Object} aliases - Optional location aliases mapping
  * @returns {string} A user-friendly location name
  */
-const getDisplayNameForLocation = (drink) => {
+const getDisplayNameForLocation = (drink, aliases = {}) => {
   // Add debugging to see what data we're working with
   console.log('Processing location for drink:', {
     id: drink.id,
@@ -24,57 +25,64 @@ const getDisplayNameForLocation = (drink) => {
     coords: drink.location ? `${drink.location.lat},${drink.location.lng}` : 'none'
   });
 
-  // First priority: custom name set by user
-  if (drink.placeInfo?.customName) {
+  if (!drink.placeInfo) return "Unknown Location";
+
+  // First priority: check for alias if we have an address
+  if (drink.placeInfo.address && aliases[drink.placeInfo.address]) {
+    return aliases[drink.placeInfo.address];
+  }
+  
+  // Second priority: custom name set by user
+  if (drink.placeInfo.customName) {
     return drink.placeInfo.customName;
   } 
   
-  // Second priority: place name from API
-  if (drink.placeInfo?.placeName) {
+  // Third priority: place name from API
+  if (drink.placeInfo.placeName) {
     return drink.placeInfo.placeName;
   } 
   
-  // Third priority: address from API
-  if (drink.placeInfo?.address) {
+  // Fourth priority: address from API
+  if (drink.placeInfo.address) {
     // Clean up the address to be more readable
     let address = drink.placeInfo.address;
     
     // If the address includes coordinates, try to use other location info
     if (address.includes('(') && address.includes(',')) {
-      if (drink.placeInfo?.neighborhood) {
+      if (drink.placeInfo.neighborhood) {
         return drink.placeInfo.neighborhood;
       }
-      if (drink.placeInfo?.city && drink.placeInfo?.region) {
+      if (drink.placeInfo.city && drink.placeInfo.region) {
         return `${drink.placeInfo.city}, ${drink.placeInfo.region}`;
       }
     }
     
     // Remove country from address if it exists
-    if (drink.placeInfo?.country) {
+    if (drink.placeInfo.country) {
       address = address.replace(`, ${drink.placeInfo.country}`, '');
     }
     
     return address;
   }
   
-  // Fourth priority: neighborhood or city if available
-  if (drink.placeInfo?.neighborhood) {
+  // Fifth priority: neighborhood or city if available
+  if (drink.placeInfo.neighborhood) {
     return drink.placeInfo.neighborhood;
   }
   
-  if (drink.placeInfo?.city) {
+  if (drink.placeInfo.city) {
     return `${drink.placeInfo.city}${drink.placeInfo.region ? `, ${drink.placeInfo.region}` : ''}`;
   }
   
   // Last resort: coordinates but formatted to be more readable
   if (drink.location && typeof drink.location.lat === 'number' && typeof drink.location.lng === 'number') {
     // Format as "Location near [nearest city/region]" if available
-    if (drink.placeInfo?.nearestCity) {
+    if (drink.placeInfo.nearestCity) {
       return `Location near ${drink.placeInfo.nearestCity}`;
     }
     
     // If we have a region/state, at least mention that
-    if (drink.placeInfo?.region) {
+    if (drink.placeInfo.region) {
       return `Location in ${drink.placeInfo.region}`;
     }
     
@@ -89,11 +97,26 @@ const getDisplayNameForLocation = (drink) => {
 /**
  * Get location statistics for an array of drinks
  * @param {Array} drinks - Array of drink objects
+ * @param {Object} aliases - Location aliases mapping
  * @returns {Object} Location statistics
  */
-const getLocationStats = (drinks) => {
+const getLocationStats = async (drinks, userId = null) => {
   try {
     console.log(`Processing ${drinks.length} drinks for location stats`);
+    
+    // Get location aliases if userId is provided
+    let aliases = {};
+    if (userId) {
+      try {
+        const aliasesDoc = doc(db, 'locationAliases', userId);
+        const aliasesSnap = await getDoc(aliasesDoc);
+        if (aliasesSnap.exists()) {
+          aliases = aliasesSnap.data().aliases || {};
+        }
+      } catch (error) {
+        console.error('Error fetching aliases for stats:', error);
+      }
+    }
     
     // Inspect raw data to see what location information is available
     const locationDataCheck = drinks.reduce((stats, drink) => {
@@ -149,8 +172,8 @@ const getLocationStats = (drinks) => {
     const placeNameMapping = {};
     
     drinksWithLocation.forEach(drink => {
-      // Get display name for this location
-      const displayName = getDisplayNameForLocation(drink);
+      // Get display name for this location using aliases
+      const displayName = getDisplayNameForLocation(drink, aliases);
       
       // Store mapping between display name and original place info for debugging
       if (!placeNameMapping[displayName]) {
@@ -342,6 +365,95 @@ const locationService = {
 
   getDisplayNameForLocation,
   getLocationStats,
+
+  // Get all location aliases for a user
+  async getUserLocationAliases(userId) {
+    try {
+      const aliasesDoc = doc(db, 'locationAliases', userId);
+      const aliasesSnap = await getDoc(aliasesDoc);
+      if (!aliasesSnap.exists()) {
+        return {};
+      }
+      return aliasesSnap.data().aliases || {};
+    } catch (error) {
+      console.error('Error fetching location aliases:', error);
+      return {};
+    }
+  },
+
+  // Set a location alias
+  async setLocationAlias(userId, originalAddress, customName) {
+    try {
+      if (!originalAddress || customName.length > 40) return false;
+      
+      const aliasesDoc = doc(db, 'locationAliases', userId);
+      const aliasesSnap = await getDoc(aliasesDoc);
+      
+      const aliases = aliasesSnap.exists() ? aliasesSnap.data().aliases || {} : {};
+      aliases[originalAddress] = customName;
+      
+      await setDoc(aliasesDoc, {
+        aliases,
+        updatedAt: new Date()
+      }, { merge: true });
+      
+      return true;
+    } catch (error) {
+      console.error('Error setting location alias:', error);
+      return false;
+    }
+  },
+
+  // Remove a location alias
+  async removeLocationAlias(userId, originalAddress) {
+    try {
+      const aliasesDoc = doc(db, 'locationAliases', userId);
+      const aliasesSnap = await getDoc(aliasesDoc);
+      
+      if (!aliasesSnap.exists()) return true;
+      
+      const aliases = aliasesSnap.data().aliases || {};
+      delete aliases[originalAddress];
+      
+      await setDoc(aliasesDoc, {
+        aliases,
+        updatedAt: new Date()
+      }, { merge: true });
+      
+      return true;
+    } catch (error) {
+      console.error('Error removing location alias:', error);
+      return false;
+    }
+  },
+
+  // Get display name for a location
+  async getLocationDisplayName(userId, placeInfo) {
+    if (!placeInfo) return 'Unknown Location';
+    
+    const address = placeInfo.address;
+    if (!address) {
+      return placeInfo.neighborhood ? 
+        `${placeInfo.neighborhood}, ${placeInfo.city}` : 
+        'Unknown Location';
+    }
+
+    try {
+      const aliasesDoc = doc(db, 'locationAliases', userId);
+      const aliasesSnap = await getDoc(aliasesDoc);
+      
+      if (aliasesSnap.exists()) {
+        const aliases = aliasesSnap.data().aliases || {};
+        if (aliases[address]) {
+          return aliases[address];
+        }
+      }
+    } catch (error) {
+      console.error('Error getting location alias:', error);
+    }
+
+    return address;
+  }
 };
 
-export { locationService }; 
+export default locationService; 

@@ -36,6 +36,7 @@ import { db } from '../config/firebase';
 import { collection, query, where, getDocs, doc, getDoc, orderBy, limit, deleteDoc, updateDoc } from 'firebase/firestore';
 import DrinkGraph from '../components/DrinkGraph';
 import { exportService } from '../services/exportService';
+import LocationEdit from '../components/LocationEdit';
 
 export default function Profile() {
   const { user } = useAuth();
@@ -372,11 +373,21 @@ export default function Profile() {
                         {drink.placeInfo && (
                           <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
                             <LocationIcon sx={{ fontSize: '0.9rem', color: 'var(--text-secondary)', mr: 0.5 }} />
-                            <Typography variant="body2" color="var(--text-secondary)">
-                              {drink.placeInfo.neighborhood ? 
-                                `${drink.placeInfo.neighborhood}, ${drink.placeInfo.city}` : 
-                                drink.placeInfo.address || 'Unknown Location'}
-                            </Typography>
+                            {isOwnProfile ? (
+                              <LocationEdit 
+                                placeInfo={drink.placeInfo} 
+                                onLocationUpdated={() => {
+                                  fetchRecentDrinks();
+                                  fetchAllDrinks();
+                                }}
+                              />
+                            ) : (
+                              <Typography variant="body2" color="var(--text-secondary)">
+                                {drink.placeInfo.neighborhood ? 
+                                  `${drink.placeInfo.neighborhood}, ${drink.placeInfo.city}` : 
+                                  drink.placeInfo.address || 'Unknown Location'}
+                              </Typography>
+                            )}
                           </Box>
                         )}
                       </Box>

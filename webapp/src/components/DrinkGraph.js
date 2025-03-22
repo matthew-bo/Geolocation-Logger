@@ -115,9 +115,25 @@ const Calendar = ({ data, metric, currentDate, setCurrentDate }) => {
   };
 
   const maxValue = Math.max(...Object.values(data));
+  const today = new Date();
+
+  // Recalculate optimal cell size
+  // Parent container height is 450px (xs) or 550px (sm)
+  // Need to fit: header + 5 rows of dates (typical month view)
+  // Account for minimal padding and gaps
+  const cellHeight = { 
+    xs: '75px',  // (450 - 30px padding/gaps) / 5.5 rows ≈ 75px
+    sm: '90px'   // (550 - 30px padding/gaps) / 5.5 rows ≈ 90px
+  };
 
   return (
-    <Box sx={{ width: '100%', p: { xs: 1, sm: 2 } }}>
+    <Box sx={{ 
+      width: '100%',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      p: { xs: 0.5, sm: 1 }
+    }}>
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
@@ -125,98 +141,133 @@ const Calendar = ({ data, metric, currentDate, setCurrentDate }) => {
         mb: 1
       }}>
         <IconButton 
-          onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
+          onClick={() => {
+            const newDate = new Date(currentDate);
+            newDate.setMonth(newDate.getMonth() - 1);
+            setCurrentDate(newDate);
+          }}
           size="small"
+          sx={{ color: 'var(--text-primary)' }}
         >
-          <Typography variant="body2">←</Typography>
+          <Typography variant="body1">←</Typography>
         </IconButton>
-        <Typography variant="subtitle1">
+        <Typography variant="body1" sx={{ color: 'var(--text-primary)' }}>
           {format(currentDate, 'MMMM yyyy')}
         </Typography>
         <IconButton 
-          onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
+          onClick={() => {
+            const newDate = new Date(currentDate);
+            newDate.setMonth(newDate.getMonth() + 1);
+            setCurrentDate(newDate);
+          }}
           size="small"
+          sx={{ color: 'var(--text-primary)' }}
         >
-          <Typography variant="body2">→</Typography>
+          <Typography variant="body1">→</Typography>
         </IconButton>
       </Box>
-      <Grid container spacing={0.5}>
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
-          <Grid item xs={12/7} key={day}>
-            <Typography align="center" sx={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>
-              {day}
-            </Typography>
-          </Grid>
-        ))}
-      </Grid>
-      <Box sx={{ mt: 0.5 }}>
-        {weeks.map((week, weekIndex) => (
-          <Grid container spacing={0.5} key={weekIndex}>
-            {week.map((day, dayIndex) => (
-              <Grid item xs={12/7} key={dayIndex}>
-                {day && (
-                  <Tooltip title={
-                    `${format(day, 'MMM d, yyyy')}
+
+      <Box sx={{ 
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        <Grid container spacing={0.25}>
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
+            <Grid item xs={12/7} key={day}>
+              <Typography 
+                align="center" 
+                sx={{ 
+                  color: 'var(--text-secondary)', 
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold'
+                }}
+              >
+                {day}
+              </Typography>
+            </Grid>
+          ))}
+        </Grid>
+
+        <Box sx={{ 
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {weeks.map((week, weekIndex) => (
+            <Grid 
+              container 
+              spacing={0.25}
+              key={weekIndex}
+            >
+              {week.map((day, dayIndex) => (
+                <Grid 
+                  item 
+                  xs={12/7} 
+                  key={dayIndex}
+                  sx={{ 
+                    height: cellHeight
+                  }}
+                >
+                  {day && (
+                    <Tooltip title={
+                      `${format(day, 'MMM d, yyyy')}
 ${getDateValue(day)} ${metric === 'total' ? 'drinks' : metric === 'unique' ? 'unique beers' : 'avg rating'}`
-                  }>
-                    <Box
-                      sx={{
-                        aspectRatio: '1',
-                        p: 0.5,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: 0.5,
-                        cursor: 'pointer',
-                        position: 'relative',
-                        bgcolor: isToday(day) 
-                          ? 'var(--beer-amber)'
-                          : isFuture(day)
-                          ? 'transparent'
-                          : `rgba(251, 192, 45, ${getDateValue(day) / (maxValue || 1) * 0.7})`,
-                        border: theme => isSameMonth(day, currentDate)
-                          ? isToday(day)
-                            ? '1px solid var(--copper)'
-                            : '1px solid var(--border-color)'
-                          : '1px solid var(--border-color)',
-                        opacity: isSameMonth(day, currentDate) ? 1 : 0.3,
-                        '&:hover': {
-                          bgcolor: 'var(--beer-amber)',
-                          opacity: 0.8,
-                        },
-                        minHeight: { xs: 24, sm: 32 },
-                      }}
-                    >
-                      <Typography
+                    }>
+                      <Box
                         sx={{
-                          fontSize: { xs: '0.65rem', sm: '0.75rem' },
-                          color: isToday(day) ? '#000' : 'var(--text-primary)',
-                          fontWeight: isToday(day) ? 'bold' : 'normal',
-                          lineHeight: 1,
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 0.5,
+                          cursor: 'pointer',
+                          bgcolor: isFuture(day)
+                            ? 'transparent'
+                            : `rgba(251, 192, 45, ${getDateValue(day) / (maxValue || 1) * 0.7})`,
+                          border: isSameMonth(day, currentDate)
+                            ? isToday(day)
+                              ? '2px solid var(--beer-amber)' // Highlight today with border instead of background
+                              : '1px solid var(--border-color)'
+                            : '1px solid var(--border-color)',
+                          opacity: isSameMonth(day, currentDate) ? 1 : 0.3,
+                          '&:hover': {
+                            bgcolor: 'var(--beer-amber)',
+                            opacity: 0.8,
+                          }
                         }}
                       >
-                        {format(day, 'd')}
-                      </Typography>
-                      {getDateValue(day) > 0 && (
                         <Typography
                           sx={{
-                            fontSize: { xs: '0.6rem', sm: '0.65rem' },
-                            color: isToday(day) ? '#000' : 'var(--text-secondary)',
+                            fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                            color: 'var(--text-primary)',
+                            fontWeight: isToday(day) ? 'bold' : 'normal',
                             lineHeight: 1,
-                            mt: 0.25,
                           }}
                         >
-                          {getDateValue(day)}
+                          {format(day, 'd')}
                         </Typography>
-                      )}
-                    </Box>
-                  </Tooltip>
-                )}
-              </Grid>
-            ))}
-          </Grid>
-        ))}
+                        {getDateValue(day) > 0 && (
+                          <Typography
+                            sx={{
+                              fontSize: { xs: '0.55rem', sm: '0.6rem' },
+                              color: 'var(--text-secondary)',
+                              lineHeight: 1,
+                              mt: 0.25,
+                            }}
+                          >
+                            {getDateValue(day)}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Tooltip>
+                  )}
+                </Grid>
+              ))}
+            </Grid>
+          ))}
+        </Box>
       </Box>
     </Box>
   );
@@ -550,7 +601,7 @@ export default function DrinkGraph({ drinks }) {
           </Grid>
         </Grid>
 
-        <Box sx={{ height: { xs: 300, sm: 400 } }}>
+        <Box sx={{ height: { xs: 450, sm: 550 } }}>
           {viewType === 'bar' ? (
             <Bar options={chartOptions} data={chartData} />
           ) : (

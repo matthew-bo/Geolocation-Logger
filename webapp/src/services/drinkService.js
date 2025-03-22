@@ -169,7 +169,7 @@ export const drinkService = {
           city: data.address.city || data.address.town || data.address.village,
           state: data.address.state,
           country: data.address.country,
-          neighborhood: data.address.suburb || data.address.neighbourhood,
+          neighborhood: data.address.suburb || data.address.neighbourhood || 'Unknown',
           placeName: data.name || data.display_name.split(',')[0]
         };
       } catch (error) {

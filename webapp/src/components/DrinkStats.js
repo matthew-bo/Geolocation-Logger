@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  HeatMapGrid
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
   Box,
@@ -34,6 +33,7 @@ import {
 import { DatePicker } from '@mui/x-date-pickers';
 import { format, subDays, subWeeks, subMonths, parseISO } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
+import DrinkGraph from './DrinkGraph';
 
 const timeUnitOptions = [
   { value: 'day', label: 'Daily' },
@@ -214,18 +214,17 @@ export default function DrinkStats({
       );
     }
 
-    // Heatmap view
+    // Calendar view
     return (
-      <ResponsiveContainer width="100%" height={400}>
-        <HeatMapGrid
-          data={data}
-          dataKey="total"
-          xAxis={{
-            dataKey: 'date',
-            tickFormatter: (date) => format(parseISO(date), 'MMM d'),
-          }}
-        />
-      </ResponsiveContainer>
+      <Box sx={{ 
+        height: { xs: 300, sm: 350 },
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <DrinkGraph drinks={data} />
+      </Box>
     );
   };
 

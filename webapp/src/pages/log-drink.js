@@ -27,7 +27,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { db } from '../config/firebase';
 import { collection, addDoc, query, where, getDocs, serverTimestamp, writeBatch, doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
-import { locationService } from '../services/locationService';
+import locationService from '../services/locationService';
 import { toast } from 'react-toastify';
 
 // Custom styled Rating component

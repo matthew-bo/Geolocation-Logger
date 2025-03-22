@@ -8,6 +8,7 @@ import Map, {
   GeolocateControl
 } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import mapboxgl from 'mapbox-gl';
 import {
   Box,
   Typography,
@@ -19,23 +20,22 @@ import {
 import { 
   LocalBar as DrinkIcon,
   Person as PersonIcon,
-  Edit as EditIcon,
   LocationOn as LocationIcon 
 } from '@mui/icons-material';
-import mapboxgl from 'mapbox-gl';
 import { useRouter } from 'next/router';
+import { format } from 'date-fns';
+import { useAuth } from '../context/AuthContext';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-export default function MapComponent({ 
+function MapComponent({ 
   drinks = [], 
   friendDrinks = [], 
   selectedDrink, 
   setSelectedDrink,
   handleMouseMove,
   getMarkerSize,
-  getMarkerColor,
-  onEditLocation
+  getMarkerColor
 }) {
   const mapRef = useRef(null);
   const [mapError, setMapError] = useState(null);
@@ -50,6 +50,7 @@ export default function MapComponent({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const router = useRouter();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!MAPBOX_TOKEN) {
@@ -75,8 +76,8 @@ export default function MapComponent({
           }
         });
 
-        if (hasValidCoordinates) {
-          mapRef.current.fitBounds(bounds, {
+        if (hasValidCoordinates && mapRef.current.getMap) {
+          mapRef.current.getMap().fitBounds(bounds, {
             padding: {
               top: isMobile ? 180 : 200,
               bottom: 50,
@@ -92,14 +93,6 @@ export default function MapComponent({
       }
     }
   }, [drinks, friendDrinks, isMobile]);
-
-  // Handle click on edit location button in popup
-  const handleEditLocationClick = (drink, e) => {
-    e.stopPropagation(); // Prevent closing the popup
-    if (onEditLocation) {
-      onEditLocation(drink);
-    }
-  };
 
   if (mapError) {
     return (
@@ -309,19 +302,6 @@ export default function MapComponent({
                     'Unknown Location'
                   )}
                 </Typography>
-                {onEditLocation && (
-                  <IconButton 
-                    size="small" 
-                    onClick={(e) => handleEditLocationClick(selectedDrink, e)}
-                    sx={{ 
-                      p: 0.3,
-                      ml: 0.5,
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } 
-                    }}
-                  >
-                    <EditIcon sx={{ fontSize: isMobile ? '0.7rem' : '0.8rem' }} />
-                  </IconButton>
-                )}
               </Box>
               
               <Typography 
@@ -348,4 +328,6 @@ export default function MapComponent({
       </Map>
     </div>
   );
-} 
+}
+
+export default MapComponent; 

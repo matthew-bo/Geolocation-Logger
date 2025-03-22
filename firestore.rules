@@ -156,5 +156,11 @@ service cloud.firestore {
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
+
+    // Location aliases collection
+    match /locationAliases/{userId} {
+      allow read: if isAuthenticated();  // Allow any authenticated user to read aliases
+      allow write: if isAuthenticated() && request.auth.uid == userId;  // Only owner can write
+    }
   }
 }

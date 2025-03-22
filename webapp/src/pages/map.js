@@ -52,9 +52,9 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 
-// Dynamically import the Map component with no SSR
-const MapComponent = dynamic(
-  () => import('../components/MapComponent'),
+// Dynamically import the MapWrapper component
+const MapWrapper = dynamic(
+  () => import('../components/MapWrapper'),
   { 
     ssr: false,
     loading: () => (
@@ -660,7 +660,7 @@ export default function MapPage() {
             borderRadius: '12px',
             overflow: 'hidden'
           }}>
-            <MapComponent
+            <MapWrapper
               drinks={filteredDrinks}
               friendDrinks={showFriendLogs ? filteredFriendDrinks : []}
               selectedDrink={selectedDrink}

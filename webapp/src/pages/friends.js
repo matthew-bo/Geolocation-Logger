@@ -14,6 +14,15 @@ import {
   Avatar,
   Fade,
   Button,
+  CircularProgress,
+  Alert,
+  Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Skeleton,
 } from '@mui/material';
 import {
   PersonAdd as AddIcon,
@@ -23,6 +32,7 @@ import {
   Group as FriendsIcon,
   Search as SearchIcon,
   ChevronRight as ChevronRightIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { friendService } from '../services/friendService';
@@ -53,7 +63,18 @@ export default function Friends() {
   const [friends, setFriends] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [tabValue, setTabValue] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [friendToRemove, setFriendToRemove] = useState(null);
+  const [actionLoading, setActionLoading] = useState({
+    request: null,
+    friend: null
+  });
+  const [refreshing, setRefreshing] = useState(false);
 
   // Generate random bubbles
   const bubbles = Array.from({ length: 8 }, (_, i) => ({
@@ -76,6 +97,7 @@ export default function Friends() {
       setFriends(friendsList);
     } catch (error) {
       console.error('Error fetching friends:', error);
+      setError('Failed to load friends. Please try again.');
     }
   };
 
@@ -85,12 +107,16 @@ export default function Friends() {
       setPendingRequests(requests);
     } catch (error) {
       console.error('Error fetching requests:', error);
+      setError('Failed to load friend requests. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSearch = async () => {
     if (searchTerm.length < 2) return;
-    setLoading(true);
+    setSearchLoading(true);
+    setError(null);
     try {
       console.log("Searching for:", searchTerm, "with user ID:", user?.uid);
       
@@ -98,22 +124,19 @@ export default function Friends() {
       const usersRef = collection(db, 'users');
       const snapshot = await getDocs(usersRef);
       
-      // Normalize search term: remove extra spaces and convert to lowercase
+      // Normalize search term
       const searchTermNormalized = searchTerm.toLowerCase().trim().replace(/\s+/g, ' ');
       const results = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .filter(u => {
-          // Don't show current user in results
           if (u.id === user?.uid) return false;
           
-          // Normalize all fields: remove extra spaces and convert to lowercase
           const username = (u.username || '').toLowerCase().trim().replace(/\s+/g, ' ');
           const email = (u.email || '').toLowerCase().trim();
           const displayName = (u.displayName || '').toLowerCase().trim().replace(/\s+/g, ' ');
           const firstName = (u.firstName || '').toLowerCase().trim().replace(/\s+/g, ' ');
           const lastName = (u.lastName || '').toLowerCase().trim().replace(/\s+/g, ' ');
           
-          // Check if any part of the normalized search term matches any part of the normalized fields
           const searchParts = searchTermNormalized.split(' ');
           return searchParts.every(part => 
             username.includes(part) || 
@@ -124,12 +147,12 @@ export default function Friends() {
           );
         });
       
-      console.log("Found users:", results);
       setSearchResults(results);
     } catch (error) {
       console.error('Error searching users:', error);
+      setError('Failed to search users. Please try again.');
     } finally {
-      setLoading(false);
+      setSearchLoading(false);
     }
   };
 
@@ -145,45 +168,105 @@ export default function Friends() {
   }, [searchTerm]);
 
   const handleSendRequest = async (receiverId) => {
+    setActionLoading(prev => ({ ...prev, request: receiverId }));
     try {
       await friendService.sendFriendRequest(user.uid, receiverId);
       setSearchResults(prev => prev.filter(user => user.id !== receiverId));
+      setSuccessMessage('Friend request sent successfully');
+      setShowSuccess(true);
     } catch (error) {
       console.error('Error sending friend request:', error);
+      setError('Failed to send friend request. Please try again.');
+    } finally {
+      setActionLoading(prev => ({ ...prev, request: null }));
     }
   };
 
   const handleAcceptRequest = async (requestId) => {
+    setActionLoading(prev => ({ ...prev, request: requestId }));
     try {
       await friendService.acceptFriendRequest(requestId);
       setPendingRequests(prev => prev.filter(req => req.id !== requestId));
-      fetchFriends();
+      await fetchFriends();
+      setSuccessMessage('Friend request accepted');
+      setShowSuccess(true);
     } catch (error) {
       console.error('Error accepting friend request:', error);
+      setError('Failed to accept friend request. Please try again.');
+    } finally {
+      setActionLoading(prev => ({ ...prev, request: null }));
     }
   };
 
   const handleRejectRequest = async (requestId) => {
+    setActionLoading(prev => ({ ...prev, request: requestId }));
     try {
       await friendService.rejectFriendRequest(requestId);
       setPendingRequests(prev => prev.filter(req => req.id !== requestId));
+      setSuccessMessage('Friend request rejected');
+      setShowSuccess(true);
     } catch (error) {
       console.error('Error rejecting friend request:', error);
+      setError('Failed to reject friend request. Please try again.');
+    } finally {
+      setActionLoading(prev => ({ ...prev, request: null }));
     }
   };
 
-  const handleRemoveFriend = async (friendId) => {
+  const handleRemoveFriend = async () => {
+    if (!friendToRemove) return;
+    
+    setActionLoading(prev => ({ ...prev, friend: friendToRemove.id }));
     try {
-      await friendService.removeFriend(user.uid, friendId);
-      setFriends(prev => prev.filter(friend => friend.id !== friendId));
+      await friendService.removeFriend(user.uid, friendToRemove.id);
+      setFriends(prev => prev.filter(friend => friend.id !== friendToRemove.id));
+      setSuccessMessage('Friend removed successfully');
+      setShowSuccess(true);
     } catch (error) {
       console.error('Error removing friend:', error);
+      setError('Failed to remove friend. Please try again.');
+    } finally {
+      setActionLoading(prev => ({ ...prev, friend: null }));
+      setShowRemoveConfirm(false);
+      setFriendToRemove(null);
     }
   };
 
   const handleViewProfile = (friendId) => {
     router.push(`/profile?userId=${friendId}`);
   };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setError(null);
+    try {
+      await Promise.all([
+        fetchFriends(),
+        fetchPendingRequests()
+      ]);
+      setSuccessMessage('Friends list refreshed');
+      setShowSuccess(true);
+    } catch (error) {
+      console.error('Error refreshing friends:', error);
+      setError('Failed to refresh friends list. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ 
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: 'var(--background)'
+      }}>
+        <CircularProgress sx={{ color: 'var(--beer-amber)' }} />
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -225,28 +308,72 @@ export default function Friends() {
           </Typography>
         </Box>
 
-        <Card className="glass-card" sx={{ mb: 4 }}>
-          <Tabs
-            value={tabValue}
-            onChange={(e, newValue) => setTabValue(newValue)}
-            variant="fullWidth"
-            sx={{
-              borderBottom: '1px solid var(--glass-border)',
-              '& .MuiTab-root': {
-                color: 'var(--text-secondary)',
-                '&.Mui-selected': {
-                  color: 'var(--beer-amber)',
-                },
-              },
-              '& .MuiTabs-indicator': {
-                backgroundColor: 'var(--beer-amber)',
-              },
-            }}
+        {error && (
+          <Alert 
+            severity="error" 
+            sx={{ mb: 4 }}
+            action={
+              <Button 
+                color="inherit" 
+                size="small" 
+                onClick={handleRefresh}
+                startIcon={<RefreshIcon />}
+              >
+                Retry
+              </Button>
+            }
           >
-            <Tab label="My Friends" />
-            <Tab label="Add Friends" />
-            <Tab label={`Requests (${pendingRequests.length})`} />
-          </Tabs>
+            {error}
+          </Alert>
+        )}
+
+        <Card className="glass-card" sx={{ mb: 4 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            p: 2,
+            borderBottom: '1px solid var(--border-color)'
+          }}>
+            <Tabs
+              value={tabValue}
+              onChange={(e, newValue) => setTabValue(newValue)}
+              variant="fullWidth"
+              sx={{
+                flex: 1,
+                '& .MuiTab-root': {
+                  color: 'var(--text-secondary)',
+                  '&.Mui-selected': {
+                    color: 'var(--beer-amber)',
+                  },
+                },
+                '& .MuiTabs-indicator': {
+                  backgroundColor: 'var(--beer-amber)',
+                },
+              }}
+            >
+              <Tab label="My Friends" />
+              <Tab label="Add Friends" />
+              <Tab label={`Requests (${pendingRequests.length})`} />
+            </Tabs>
+            <Button
+              variant="outlined"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              sx={{
+                ml: 2,
+                borderColor: 'var(--beer-amber)',
+                color: 'var(--beer-amber)',
+                '&:hover': { borderColor: 'var(--copper)' }
+              }}
+            >
+              {refreshing ? (
+                <CircularProgress size={20} />
+              ) : (
+                <RefreshIcon />
+              )}
+            </Button>
+          </Box>
 
           <Box sx={{ p: 3 }}>
             {tabValue === 0 && (
@@ -275,11 +402,17 @@ export default function Friends() {
                         edge="end"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleRemoveFriend(friend.id);
+                          setFriendToRemove(friend);
+                          setShowRemoveConfirm(true);
                         }}
+                        disabled={actionLoading.friend === friend.id}
                         sx={{ color: 'var(--text-secondary)' }}
                       >
-                        <RemoveIcon />
+                        {actionLoading.friend === friend.id ? (
+                          <CircularProgress size={20} />
+                        ) : (
+                          <RemoveIcon />
+                        )}
                       </IconButton>
                     </ListItemSecondaryAction>
                   </ListItem>
@@ -304,13 +437,18 @@ export default function Friends() {
                   placeholder="Search users by username"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={searchLoading}
                   inputProps={{
                     maxLength: 50,
                     pattern: "[A-Za-z0-9_-]*",
                     title: "Only letters, numbers, underscores, and hyphens are allowed"
                   }}
                   InputProps={{
-                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'var(--text-secondary)' }} />,
+                    startAdornment: searchLoading ? (
+                      <CircularProgress size={20} sx={{ mr: 1 }} />
+                    ) : (
+                      <SearchIcon sx={{ mr: 1, color: 'var(--text-secondary)' }} />
+                    ),
                   }}
                   sx={{
                     mb: 2,
@@ -321,50 +459,6 @@ export default function Friends() {
                     }
                   }}
                 />
-                <List>
-                  {friends.map((friend) => (
-                    <ListItem
-                      key={friend.id}
-                      button
-                      onClick={() => handleViewProfile(friend.id)}
-                      sx={{
-                        borderBottom: '1px solid var(--border-color)',
-                        '&:last-child': { borderBottom: 'none' },
-                      }}
-                    >
-                      <Avatar
-                        src={friend.photoURL}
-                        sx={{ mr: 2, bgcolor: 'var(--beer-amber)' }}
-                      >
-                        {friend.username?.[0]?.toUpperCase() || friend.displayName?.[0]?.toUpperCase() || '?'}
-                      </Avatar>
-                      <ListItemText
-                        primary={friend.username || friend.displayName || 'Anonymous Beer Lover'}
-                      />
-                      <ListItemSecondaryAction>
-                        <IconButton
-                          edge="end"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveFriend(friend.id);
-                          }}
-                          sx={{ color: 'var(--text-secondary)' }}
-                        >
-                          <RemoveIcon />
-                        </IconButton>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                  ))}
-                  {friends.length === 0 && (
-                    <ListItem>
-                      <ListItemText
-                        primary="No friends yet"
-                        secondary="Add some friends to see their beer journey!"
-                        sx={{ textAlign: 'center', color: 'var(--text-secondary)' }}
-                      />
-                    </ListItem>
-                  )}
-                </List>
 
                 {/* Search Results */}
                 <List>
@@ -389,13 +483,27 @@ export default function Friends() {
                         <IconButton
                           edge="end"
                           onClick={() => handleSendRequest(result.id)}
+                          disabled={actionLoading.request === result.id}
                           sx={{ color: 'var(--beer-amber)' }}
                         >
-                          <AddIcon />
+                          {actionLoading.request === result.id ? (
+                            <CircularProgress size={20} />
+                          ) : (
+                            <AddIcon />
+                          )}
                         </IconButton>
                       </ListItemSecondaryAction>
                     </ListItem>
                   ))}
+                  {searchTerm.length >= 2 && searchResults.length === 0 && !searchLoading && (
+                    <ListItem>
+                      <ListItemText
+                        primary="No users found"
+                        secondary="Try a different search term"
+                        sx={{ textAlign: 'center', color: 'var(--text-secondary)' }}
+                      />
+                    </ListItem>
+                  )}
                 </List>
               </Box>
             )}
@@ -424,16 +532,26 @@ export default function Friends() {
                       <IconButton
                         edge="end"
                         onClick={() => handleAcceptRequest(request.id)}
+                        disabled={actionLoading.request === request.id}
                         sx={{ color: 'var(--beer-amber)', mr: 1 }}
                       >
-                        <AcceptIcon />
+                        {actionLoading.request === request.id ? (
+                          <CircularProgress size={20} />
+                        ) : (
+                          <AcceptIcon />
+                        )}
                       </IconButton>
                       <IconButton
                         edge="end"
                         onClick={() => handleRejectRequest(request.id)}
+                        disabled={actionLoading.request === request.id}
                         sx={{ color: 'var(--text-secondary)' }}
                       >
-                        <RejectIcon />
+                        {actionLoading.request === request.id ? (
+                          <CircularProgress size={20} />
+                        ) : (
+                          <RejectIcon />
+                        )}
                       </IconButton>
                     </ListItemSecondaryAction>
                   </ListItem>
@@ -452,6 +570,64 @@ export default function Friends() {
           </Box>
         </Card>
       </Box>
+
+      {/* Remove Friend Confirmation Dialog */}
+      <Dialog
+        open={showRemoveConfirm}
+        onClose={() => !actionLoading.friend && setShowRemoveConfirm(false)}
+        PaperProps={{
+          sx: {
+            bgcolor: 'var(--background)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-color)',
+          }
+        }}
+      >
+        <DialogTitle>Remove Friend?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: 'var(--text-secondary)' }}>
+            Are you sure you want to remove {friendToRemove?.username || 'this friend'}? You'll need to send a new friend request to add them again.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setShowRemoveConfirm(false)}
+            disabled={actionLoading.friend}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleRemoveFriend}
+            disabled={actionLoading.friend}
+            color="error"
+          >
+            {actionLoading.friend ? (
+              <>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                Removing...
+              </>
+            ) : (
+              'Remove'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={showSuccess}
+        autoHideDuration={3000}
+        onClose={() => setShowSuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setShowSuccess(false)} 
+          severity="success"
+          sx={{ width: '100%' }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 } 

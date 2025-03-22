@@ -22,6 +22,8 @@ import {
   DialogContentText,
   DialogActions,
   Tooltip,
+  Snackbar,
+  Collapse,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -30,6 +32,11 @@ import {
   Star as StarIcon,
   Delete as DeleteIcon,
   LocationOn as LocationIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  Public as GlobeIcon,
+  LocationCity as CityIcon,
+  Apartment as StateIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../config/firebase';
@@ -57,6 +64,20 @@ export default function Profile() {
   const [drinkToDelete, setDrinkToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [allDrinks, setAllDrinks] = useState([]);
+  const [sectionLoading, setSectionLoading] = useState({
+    profile: true,
+    stats: true,
+    recent: true,
+    calendar: true
+  });
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [locationStats, setLocationStats] = useState({
+    cities: new Set(),
+    states: new Set(),
+    countries: new Set(),
+  });
+  const [showLocationDetails, setShowLocationDetails] = useState(false);
 
   const isOwnProfile = !profileUserId || profileUserId === user?.uid;
   const targetUserId = profileUserId || user?.uid;
@@ -86,20 +107,26 @@ export default function Profile() {
   };
 
   const fetchUserProfile = async () => {
+    setSectionLoading(prev => ({ ...prev, profile: true }));
     try {
       const userDocRef = doc(db, 'users', targetUserId);
       const userDoc = await getDoc(userDocRef);
       
       if (userDoc.exists()) {
         setUserData(userDoc.data());
+      } else {
+        setError('User profile not found.');
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
       throw error;
+    } finally {
+      setSectionLoading(prev => ({ ...prev, profile: false }));
     }
   };
 
   const fetchRecentDrinks = async () => {
+    setSectionLoading(prev => ({ ...prev, recent: true }));
     try {
       const drinksQuery = query(
         collection(db, 'drinks'),
@@ -107,77 +134,41 @@ export default function Profile() {
         orderBy('timestamp', 'desc'),
         limit(10)
       );
-      const drinksSnapshot = await getDocs(drinksQuery);
-      const drinks = drinksSnapshot.docs.map(doc => {
-        const data = doc.data();
-        let timestamp;
-        
-        // Handle different timestamp formats
-        if (data.timestamp) {
-          if (typeof data.timestamp.toDate === 'function') {
-            // Firestore Timestamp
-            timestamp = data.timestamp.toDate();
-          } else if (data.timestamp._seconds) {
-            // Firestore Timestamp in seconds
-            timestamp = new Date(data.timestamp._seconds * 1000);
-          } else {
-            // Regular date string or timestamp
-            timestamp = new Date(data.timestamp);
-          }
-        } else {
-          timestamp = new Date();
-        }
-
-        return {
-          id: doc.id,
-          ...data,
-          timestamp
-        };
-      });
+      const snapshot = await getDocs(drinksQuery);
+      const drinks = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate()
+      }));
       setRecentDrinks(drinks);
     } catch (error) {
       console.error('Error fetching recent drinks:', error);
       throw error;
+    } finally {
+      setSectionLoading(prev => ({ ...prev, recent: false }));
     }
   };
 
   const fetchAllDrinks = async () => {
+    setSectionLoading(prev => ({ ...prev, calendar: true }));
     try {
       const drinksQuery = query(
         collection(db, 'drinks'),
-        where('userId', '==', targetUserId)
+        where('userId', '==', targetUserId),
+        orderBy('timestamp', 'desc')
       );
-      const drinksSnapshot = await getDocs(drinksQuery);
-      const drinks = drinksSnapshot.docs.map(doc => {
-        const data = doc.data();
-        let timestamp;
-        
-        // Handle different timestamp formats
-        if (data.timestamp) {
-          if (typeof data.timestamp.toDate === 'function') {
-            // Firestore Timestamp
-            timestamp = data.timestamp.toDate();
-          } else if (data.timestamp._seconds) {
-            // Firestore Timestamp in seconds
-            timestamp = new Date(data.timestamp._seconds * 1000);
-          } else {
-            // Regular date string or timestamp
-            timestamp = new Date(data.timestamp);
-          }
-        } else {
-          timestamp = new Date();
-        }
-
-        return {
-          id: doc.id,
-          ...data,
-          timestamp: timestamp.toISOString(), // Convert to ISO string for export compatibility
-        };
-      });
+      const snapshot = await getDocs(drinksQuery);
+      const drinks = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate()
+      }));
       setAllDrinks(drinks);
     } catch (error) {
       console.error('Error fetching all drinks:', error);
-      throw error;
+      setError('Failed to load drink history. Please try again later.');
+    } finally {
+      setSectionLoading(prev => ({ ...prev, calendar: false }));
     }
   };
 
@@ -192,8 +183,13 @@ export default function Profile() {
     setDeleteLoading(true);
     try {
       await deleteDoc(doc(db, 'drinks', drinkToDelete.id));
-      setRecentDrinks(recentDrinks.filter(drink => drink.id !== drinkToDelete.id));
-      fetchUserStats();
+      setRecentDrinks(prev => prev.filter(d => d.id !== drinkToDelete.id));
+      setAllDrinks(prev => prev.filter(d => d.id !== drinkToDelete.id));
+      setSuccessMessage('Drink deleted successfully');
+      setShowSuccess(true);
+      
+      // Refresh stats after deletion
+      await fetchUserStats();
     } catch (error) {
       console.error('Error deleting drink:', error);
       setError('Failed to delete drink. Please try again.');
@@ -205,35 +201,58 @@ export default function Profile() {
   };
 
   const fetchUserStats = async () => {
+    setSectionLoading(prev => ({ ...prev, stats: true }));
     try {
       const drinksQuery = query(
         collection(db, 'drinks'),
         where('userId', '==', targetUserId)
       );
-      const drinksSnapshot = await getDocs(drinksQuery);
-      const drinks = drinksSnapshot.docs.map(doc => doc.data());
+      const snapshot = await getDocs(drinksQuery);
+      const drinks = snapshot.docs.map(doc => doc.data());
 
-      const uniqueBrands = [...new Set(drinks.map(drink => drink.brand))];
-      const brandCounts = drinks.reduce((acc, drink) => {
-        acc[drink.brand] = (acc[drink.brand] || 0) + 1;
+      // Calculate basic stats
+      const totalDrinks = drinks.length;
+      const uniqueBeers = new Set(drinks.map(d => d.brand)).size;
+      const totalOunces = drinks.reduce((sum, d) => sum + (d.amount || 0), 0);
+
+      // Find favorite beer
+      const beerCounts = drinks.reduce((acc, d) => {
+        acc[d.brand] = (acc[d.brand] || 0) + 1;
         return acc;
       }, {});
+      const favoriteBeer = Object.entries(beerCounts)
+        .sort(([,a], [,b]) => b - a)[0]?.[0];
 
-      const totalOunces = drinks.reduce((sum, drink) => sum + (drink.amount || 0), 0);
-      
-      const favoriteBeer = Object.entries(brandCounts)
-        .sort(([,a], [,b]) => b - a)[0]?.[0] || null;
+      // Calculate location stats
+      const cities = new Set();
+      const states = new Set();
+      const countries = new Set();
+
+      drinks.forEach(drink => {
+        if (drink.placeInfo) {
+          if (drink.placeInfo.city) cities.add(drink.placeInfo.city);
+          if (drink.placeInfo.state) states.add(drink.placeInfo.state);
+          if (drink.placeInfo.country) countries.add(drink.placeInfo.country);
+        }
+      });
+
+      setLocationStats({
+        cities: Array.from(cities).sort(),
+        states: Array.from(states).sort(),
+        countries: Array.from(countries).sort(),
+      });
 
       setStats({
-        totalDrinks: drinks.length,
-        uniqueBeers: uniqueBrands.length,
+        totalDrinks,
+        uniqueBeers,
         favoriteBeer,
         totalOunces,
-        friends: 0,
       });
     } catch (error) {
       console.error('Error fetching user stats:', error);
       throw error;
+    } finally {
+      setSectionLoading(prev => ({ ...prev, stats: false }));
     }
   };
 
@@ -242,108 +261,321 @@ export default function Profile() {
     return new Date(timestamp).toLocaleDateString();
   };
 
-  const handleExport = (format) => {
-    switch (format) {
-      case 'excel':
-        exportService.exportToExcel(allDrinks);
-        break;
-      case 'csv':
-        exportService.exportToCsv(allDrinks);
-        break;
-      case 'json':
-        exportService.exportToJson(allDrinks);
-        break;
-      default:
-        console.error('Unsupported export format');
+  const handleExport = async (format) => {
+    try {
+      const data = await exportService.exportData(targetUserId, format);
+      const blob = new Blob([data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `drink-history.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      setSuccessMessage('Data exported successfully');
+      setShowSuccess(true);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      setError('Failed to export data. Please try again.');
     }
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
-        <CircularProgress />
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh',
+        bgcolor: 'var(--background)'
+      }}>
+        <CircularProgress sx={{ color: 'var(--beer-amber)' }} />
       </Box>
     );
   }
 
   if (error) {
     return (
-      <Alert severity="error" sx={{ mt: 2 }}>
-        {error}
-      </Alert>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert 
+          severity="error" 
+          action={
+            <Button color="inherit" size="small" onClick={fetchUserData}>
+              Retry
+            </Button>
+          }
+          sx={{ mb: 2 }}
+        >
+          {error}
+        </Alert>
+      </Container>
     );
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', pt: 10, px: 2 }}>
-      <Container maxWidth="lg">
-        <Card className="glass-card" sx={{ mb: 4, position: 'relative' }}>
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Avatar
-              sx={{
-                width: 120,
-                height: 120,
-                mx: 'auto',
-                mb: 2,
-                bgcolor: 'var(--beer-amber)',
-                fontSize: '2.5rem'
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Profile Section */}
+      <Card sx={{ mb: 4, position: 'relative' }}>
+        {sectionLoading.profile && (
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            bgcolor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1
+          }}>
+            <CircularProgress sx={{ color: 'var(--beer-amber)' }} />
+          </Box>
+        )}
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Avatar
+            sx={{
+              width: 120,
+              height: 120,
+              mx: 'auto',
+              mb: 2,
+              bgcolor: 'var(--beer-amber)',
+              fontSize: '2.5rem'
+            }}
+          >
+            {userData?.username?.[0]?.toUpperCase() || userData?.email?.[0]?.toUpperCase()}
+          </Avatar>
+          
+          <Typography variant="h4" gutterBottom>
+            {userData?.username || 'Anonymous Beer Lover'}
+          </Typography>
+          <Typography variant="body1" color="textSecondary">
+            Member since {formatDate(userData?.createdAt)}
+          </Typography>
+        </Box>
+      </Card>
+
+      {/* Stats Section */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {[
+          { key: 'totalDrinks', label: 'Total Drinks' },
+          { key: 'uniqueBeers', label: 'Unique Beers' },
+          { key: 'totalOunces', label: 'Total Ounces' },
+          { key: 'favoriteBeer', label: 'Favorite Beer', value: stats.favoriteBeer || 'None yet' }
+        ].map((stat) => (
+          <Grid item xs={12} sm={6} md={3} key={stat.key}>
+            <Card sx={{ position: 'relative' }}>
+              {sectionLoading.stats && (
+                <Box sx={{ 
+                  position: 'absolute', 
+                  top: 0, 
+                  left: 0, 
+                  right: 0, 
+                  bottom: 0, 
+                  bgcolor: 'rgba(0,0,0,0.7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1
+                }}>
+                  <CircularProgress size={24} sx={{ color: 'var(--beer-amber)' }} />
+                </Box>
+              )}
+              <Box className="stat-card">
+                <BeerIcon sx={{ fontSize: 40, color: 'var(--beer-amber)', mb: 1 }} />
+                <Typography className="stat-value">
+                  {stat.value !== undefined ? stat.value : stats[stat.key]}
+                </Typography>
+                <Typography className="stat-label">{stat.label}</Typography>
+              </Box>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Location Stats Section */}
+      <Card sx={{ mb: 4, position: 'relative' }}>
+        {sectionLoading.stats && (
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            bgcolor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1
+          }}>
+            <CircularProgress sx={{ color: 'var(--beer-amber)' }} />
+          </Box>
+        )}
+        <Box className="premium-card" sx={{ p: 4 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            mb: showLocationDetails ? 2 : 0 
+          }}>
+            <Typography variant="h6" color="var(--beer-amber)">
+              Location Stats
+            </Typography>
+            <IconButton
+              onClick={() => setShowLocationDetails(!showLocationDetails)}
+              sx={{ 
+                transform: showLocationDetails ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.3s',
+                color: 'var(--beer-amber)'
               }}
             >
-              {userData?.username?.[0]?.toUpperCase() || userData?.email?.[0]?.toUpperCase()}
-            </Avatar>
-            
-            <Typography variant="h4" gutterBottom>
-              {userData?.username || 'Anonymous Beer Lover'}
-            </Typography>
-            <Typography variant="body1" color="textSecondary">
-              Member since {formatDate(userData?.createdAt)}
+              <ExpandMoreIcon />
+            </IconButton>
+          </Box>
+
+          <Grid container spacing={3} sx={{ mb: showLocationDetails ? 3 : 0 }}>
+            {[
+              { key: 'cities', label: 'Cities', icon: CityIcon, count: locationStats.cities.length },
+              { key: 'states', label: 'States', icon: StateIcon, count: locationStats.states.length },
+              { key: 'countries', label: 'Countries', icon: GlobeIcon, count: locationStats.countries.length }
+            ].map((stat) => (
+              <Grid item xs={12} sm={4} key={stat.key}>
+                <Card 
+                  sx={{ 
+                    p: 2,
+                    bgcolor: 'var(--background-light)',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2
+                  }}
+                >
+                  <stat.icon sx={{ fontSize: 40, color: 'var(--beer-amber)' }} />
+                  <Box>
+                    <Typography variant="h4" sx={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>
+                      {stat.count}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
+                      {stat.label}
+                    </Typography>
+                  </Box>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+
+          <Collapse in={showLocationDetails}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="subtitle1" color="var(--beer-amber)" gutterBottom>
+                  Cities
+                </Typography>
+                <List dense>
+                  {locationStats.cities.map((city) => (
+                    <ListItem key={city}>
+                      <ListItemText 
+                        primary={city}
+                        sx={{ 
+                          '& .MuiListItemText-primary': { 
+                            color: 'var(--text-primary)'
+                          }
+                        }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="subtitle1" color="var(--beer-amber)" gutterBottom>
+                  States
+                </Typography>
+                <List dense>
+                  {locationStats.states.map((state) => (
+                    <ListItem key={state}>
+                      <ListItemText 
+                        primary={state}
+                        sx={{ 
+                          '& .MuiListItemText-primary': { 
+                            color: 'var(--text-primary)'
+                          }
+                        }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="subtitle1" color="var(--beer-amber)" gutterBottom>
+                  Countries
+                </Typography>
+                <List dense>
+                  {locationStats.countries.map((country) => (
+                    <ListItem key={country}>
+                      <ListItemText 
+                        primary={country}
+                        sx={{ 
+                          '& .MuiListItemText-primary': { 
+                            color: 'var(--text-primary)'
+                          }
+                        }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Grid>
+            </Grid>
+          </Collapse>
+        </Box>
+      </Card>
+
+      {/* Drink Analytics Section */}
+      <Card sx={{ mb: 4, position: 'relative' }}>
+        {sectionLoading.calendar && (
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            bgcolor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1
+          }}>
+            <CircularProgress sx={{ color: 'var(--beer-amber)' }} />
+          </Box>
+        )}
+        <Box className="premium-card" sx={{ p: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" color="var(--beer-amber)">
+              Drink Analytics
             </Typography>
           </Box>
-        </Card>
-
-        {/* Stats Grid */}
-        <Grid container spacing={3} mb={4}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Box className="stat-card">
-              <BeerIcon sx={{ fontSize: 40, color: 'var(--beer-amber)', mb: 1 }} />
-              <Typography className="stat-value">{stats.totalDrinks}</Typography>
-              <Typography className="stat-label">Total Beers</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Box className="stat-card">
-              <BeerIcon sx={{ fontSize: 40, color: 'var(--beer-amber)', mb: 1 }} />
-              <Typography className="stat-value">{stats.uniqueBeers}</Typography>
-              <Typography className="stat-label">Unique Beers</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Box className="stat-card">
-              <BeerIcon sx={{ fontSize: 40, color: 'var(--beer-amber)', mb: 1 }} />
-              <Typography className="stat-value">{stats.totalOunces}</Typography>
-              <Typography className="stat-label">Total Ounces</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Box className="stat-card">
-              <StarIcon sx={{ fontSize: 40, color: 'var(--beer-amber)', mb: 1 }} />
-              <Typography className="stat-value">
-                {stats.favoriteBeer || 'None'}
-              </Typography>
-              <Typography className="stat-label">Favorite Beer</Typography>
-            </Box>
-          </Grid>
-        </Grid>
-
-        {/* Drink Analytics Graph */}
-        <Box sx={{ mt: 4, mb: 4 }}>
-          <Typography variant="h5" gutterBottom>
-            Drink Analytics
-          </Typography>
           <DrinkGraph drinks={recentDrinks} />
         </Box>
+      </Card>
 
-        {/* Recent Activity */}
+      {/* Recent Drinks Section */}
+      <Card sx={{ mb: 4, position: 'relative' }}>
+        {sectionLoading.recent && (
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            bgcolor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1
+          }}>
+            <CircularProgress sx={{ color: 'var(--beer-amber)' }} />
+          </Box>
+        )}
         <Box className="premium-card" sx={{ p: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" color="var(--beer-amber)">
@@ -415,77 +647,65 @@ export default function Profile() {
             </Typography>
           )}
         </Box>
+      </Card>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog
-          open={deleteConfirmOpen}
-          onClose={() => setDeleteConfirmOpen(false)}
-          PaperProps={{
-            sx: {
-              bgcolor: 'var(--background)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-color)',
-            }
-          }}
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        PaperProps={{
+          sx: {
+            bgcolor: 'var(--background)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-color)',
+          }
+        }}
+      >
+        <DialogTitle>Delete Drink?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: 'var(--text-secondary)' }}>
+            Are you sure you want to delete this drink? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setDeleteConfirmOpen(false)}
+            disabled={deleteLoading}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={confirmDeleteDrink}
+            disabled={deleteLoading}
+            color="error"
+          >
+            {deleteLoading ? (
+              <>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                Deleting...
+              </>
+            ) : (
+              'Delete'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={showSuccess}
+        autoHideDuration={3000}
+        onClose={() => setShowSuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setShowSuccess(false)} 
+          severity="success"
+          sx={{ width: '100%' }}
         >
-          <DialogTitle>
-            Delete Beer Entry
-          </DialogTitle>
-          <DialogContent>
-            <DialogContentText sx={{ color: 'var(--text-secondary)' }}>
-              Are you sure you want to delete this beer entry? This action cannot be undone.
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button 
-              onClick={() => setDeleteConfirmOpen(false)}
-              disabled={deleteLoading}
-              sx={{ color: 'var(--text-primary)' }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={confirmDeleteDrink}
-              disabled={deleteLoading}
-              sx={{ color: 'rgb(211, 47, 47)' }}
-              startIcon={deleteLoading ? <CircularProgress size={20} /> : <DeleteIcon />}
-            >
-              {deleteLoading ? 'Deleting...' : 'Delete'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {isOwnProfile && (
-          <Card className="glass-card" sx={{ mt: 4, p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Export Drink History
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button
-                variant="contained"
-                onClick={() => handleExport('excel')}
-                sx={{ bgcolor: 'var(--beer-amber)' }}
-              >
-                Export to Excel
-              </Button>
-              <Button
-                variant="contained"
-                onClick={() => handleExport('csv')}
-                sx={{ bgcolor: 'var(--beer-amber)' }}
-              >
-                Export to CSV
-              </Button>
-              <Button
-                variant="contained"
-                onClick={() => handleExport('json')}
-                sx={{ bgcolor: 'var(--beer-amber)' }}
-              >
-                Export to JSON
-              </Button>
-            </Box>
-          </Card>
-        )}
-      </Container>
-    </Box>
+          {successMessage}
+        </Alert>
+      </Snackbar>
+    </Container>
   );
 } 

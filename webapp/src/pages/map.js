@@ -48,7 +48,7 @@ import {
 import { styled } from '@mui/material/styles';
 import Layout from '../components/Layout';
 import dynamic from 'next/dynamic';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 
@@ -58,13 +58,16 @@ const MapWrapper = dynamic(
   { 
     ssr: false,
     loading: () => (
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center',
-        height: '100%', 
-        bgcolor: '#121212'
-      }}>
+      <Box 
+        sx={{ 
+          width: '100%', 
+          height: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          bgcolor: 'var(--background)'
+        }}
+      >
         <CircularProgress sx={{ color: 'var(--beer-amber)' }} />
       </Box>
     ) 
@@ -85,14 +88,17 @@ const containerTypes = [
 
 // Custom styled components
 const FilterBar = styled(Box)(({ theme }) => ({
-  width: '100%',
+  position: 'absolute',
+  top: theme.spacing(2),
+  right: theme.spacing(2),
+  zIndex: 1,
+  backgroundColor: 'var(--background)',
   padding: theme.spacing(2),
-  background: 'var(--glass-background)',
-  backdropFilter: 'blur(10px)',
-  borderBottom: '1px solid var(--glass-border)',
-  transition: 'all 0.3s ease',
-  borderRadius: '12px',
-  marginBottom: theme.spacing(2),
+  borderRadius: theme.shape.borderRadius,
+  boxShadow: theme.shadows[4],
+  border: '1px solid var(--border-color)',
+  maxWidth: '300px',
+  width: '90%',
 }));
 
 const FilterGrid = styled(Grid)(({ theme }) => ({
@@ -165,72 +171,76 @@ export default function MapPage() {
   });
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [dateRange, setDateRange] = useState([0, 100]);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    const fetchDrinks = async () => {
-      if (!user) return;
+    if (user) {
+      fetchDrinks();
+    }
+  }, [user]);
 
-      try {
-        // Fetch user's drinks
-        const drinksQuery = query(
+  const fetchDrinks = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const drinksQuery = query(
+        collection(db, 'drinks'),
+        where('userId', '==', user.uid),
+        orderBy('timestamp', 'desc')
+      );
+      const snapshot = await getDocs(drinksQuery);
+      const drinksData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate()
+      }));
+      setDrinks(drinksData);
+
+      // Only fetch friend's drinks if the user has friends
+      let friendsDrinks = [];
+      if (user.friends && user.friends.length > 0) {
+        const friendsQuery = query(
           collection(db, 'drinks'),
-          where('userId', '==', user.uid)
+          where('userId', 'in', user.friends)
         );
-        const drinksSnapshot = await getDocs(drinksQuery);
-        const userDrinks = drinksSnapshot.docs.map(doc => ({
+        const friendsSnapshot = await getDocs(friendsQuery);
+        friendsDrinks = friendsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
-
-        // Only fetch friend's drinks if the user has friends
-        let friendsDrinks = [];
-        if (user.friends && user.friends.length > 0) {
-          const friendsQuery = query(
-            collection(db, 'drinks'),
-            where('userId', 'in', user.friends)
-          );
-          const friendsSnapshot = await getDocs(friendsQuery);
-          friendsDrinks = friendsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-        }
-
-        setDrinks(userDrinks);
-        setFriendDrinks(friendsDrinks);
-      } catch (err) {
-        console.error('Error fetching drinks:', err);
-        setError('Failed to load drinks data');
-      } finally {
-        setLoading(false);
       }
-    };
+      setFriendDrinks(friendsDrinks);
 
-    fetchDrinks();
-  }, [user]);
+      if (drinksData.length > 0) {
+        const uniqueBrands = [...new Set(drinksData
+          .map(drink => drink.brand)
+          .filter(brand => brand && brand.trim() !== '')
+        )].sort();
+        setBrandOptions(uniqueBrands);
+        setFilteredBrandOptions(uniqueBrands);
 
-  useEffect(() => {
-    if (drinks.length > 0) {
-      const uniqueBrands = [...new Set(drinks
-        .map(drink => drink.brand)
-        .filter(brand => brand && brand.trim() !== '')
-      )].sort();
-      setBrandOptions(uniqueBrands);
-      setFilteredBrandOptions(uniqueBrands);
+        const uniqueContainers = [...new Set(drinksData
+          .map(drink => drink.containerType)
+          .filter(container => container && container.trim() !== '')
+        )].sort();
+        setContainerOptions(uniqueContainers);
 
-      const uniqueContainers = [...new Set(drinks
-        .map(drink => drink.containerType)
-        .filter(container => container && container.trim() !== '')
-      )].sort();
-      setContainerOptions(uniqueContainers);
-
-      const uniqueMethods = [...new Set(drinks
-        .map(drink => drink.method)
-        .filter(method => method && method.trim() !== '')
-      )].sort();
-      setMethodOptions(uniqueMethods);
+        const uniqueMethods = [...new Set(drinksData
+          .map(drink => drink.method)
+          .filter(method => method && method.trim() !== '')
+        )].sort();
+        setMethodOptions(uniqueMethods);
+      }
+    } catch (error) {
+      console.error('Error fetching drinks:', error);
+      setError('Failed to load drink locations. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  }, [drinks]);
+  };
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => {
@@ -259,6 +269,14 @@ export default function MapPage() {
   };
 
   const clearFilters = () => {
+    setShowClearConfirm(true);
+  };
+
+  const confirmClearFilters = () => {
+    setDateRange([0, 100]);
+    setShowClearConfirm(false);
+    setSuccessMessage('Filters cleared successfully');
+    setShowSuccess(true);
     setFilters({
       drinkType: ['All Drink Types'],
       container: ['All Containers'],
@@ -268,6 +286,7 @@ export default function MapPage() {
       endDate: null,
       method: ['All Methods']
     });
+    fetchDrinks();
   };
 
   const handleMouseMove = (event) => {
@@ -319,6 +338,10 @@ export default function MapPage() {
     return true;
   });
 
+  const handleDateRangeChange = (event, newValue) => {
+    setDateRange(newValue);
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -353,6 +376,23 @@ export default function MapPage() {
           <Typography variant="body2" align="center" color="var(--text-secondary)">
             Please try refreshing the page or contact support if the problem persists.
           </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<ClearIcon />}
+            onClick={fetchDrinks}
+            sx={{
+              borderColor: 'var(--glass-border)',
+              color: 'var(--text-primary)',
+              backgroundColor: 'var(--glass-background)',
+              '&:hover': {
+                borderColor: 'var(--beer-amber)',
+                color: 'var(--beer-amber)',
+                backgroundColor: 'var(--glass-background)',
+              },
+            }}
+          >
+            Retry
+          </Button>
         </Box>
       </Layout>
     );
@@ -668,10 +708,62 @@ export default function MapPage() {
               handleMouseMove={handleMouseMove}
               getMarkerSize={getMarkerSize}
               getMarkerColor={getMarkerColor}
+              onError={(error) => {
+                setError(error.message);
+              }}
+              onLocationUpdate={() => {
+                setSuccessMessage('Location updated successfully');
+                setShowSuccess(true);
+                fetchDrinks();
+              }}
             />
           </Box>
         </Box>
       </Container>
+
+      {/* Clear Filters Confirmation Dialog */}
+      <Dialog
+        open={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        PaperProps={{
+          sx: {
+            bgcolor: 'var(--background)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-color)',
+          }
+        }}
+      >
+        <DialogTitle>Clear Filters?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: 'var(--text-secondary)' }}>
+            Are you sure you want to clear all filters? This will show all drinks on the map.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowClearConfirm(false)}>
+            Cancel
+          </Button>
+          <Button onClick={confirmClearFilters} color="primary">
+            Clear
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={showSuccess}
+        autoHideDuration={3000}
+        onClose={() => setShowSuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setShowSuccess(false)} 
+          severity="success"
+          sx={{ width: '100%' }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Layout>
   );
 } 

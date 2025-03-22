@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { Box, Typography, Button, Container } from '@mui/material';
+import { 
+  Box, 
+  Typography, 
+  Button, 
+  Container,
+  CircularProgress,
+  Snackbar,
+  Alert,
+  Backdrop,
+} from '@mui/material';
 import { LocalBar as BeerIcon } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import Head from 'next/head';
@@ -25,6 +34,10 @@ const Bubble = ({ delay, size, left }) => (
 export default function Home() {
   const router = useRouter();
   const { handleProtectedAction, user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Generate random bubbles
   const bubbles = Array.from({ length: 15 }, (_, i) => ({
@@ -35,8 +48,14 @@ export default function Home() {
   }));
 
   const handleLogDrink = () => {
+    setLoading(true);
+    setError(null);
     handleProtectedAction('logDrink', () => {
       router.push('/log-drink');
+    }).catch(error => {
+      setError(error.message);
+    }).finally(() => {
+      setLoading(false);
     });
   };
 
@@ -106,9 +125,20 @@ export default function Home() {
             Track your beer adventures
           </Typography>
 
+          {error && (
+            <Alert 
+              severity="error" 
+              sx={{ mb: 4, width: '100%' }}
+              onClose={() => setError(null)}
+            >
+              {error}
+            </Alert>
+          )}
+
           <Box sx={{ position: 'relative', display: 'inline-block', width: { xs: '220px', sm: '300px' } }}>
             <Button
               onClick={handleLogDrink}
+              disabled={loading}
               sx={{
                 width: '100%',
                 height: { xs: '220px', sm: '300px' },
@@ -134,17 +164,42 @@ export default function Home() {
                 justifyContent: 'center',
                 gap: 2,
                 mb: 2,
+                '&.Mui-disabled': {
+                  background: 'linear-gradient(135deg, var(--beer-amber) 0%, var(--copper) 100%)',
+                  opacity: 0.7,
+                },
               }}
             >
-              <BeerIcon sx={{ 
-                fontSize: { xs: '4rem', sm: '5rem' },
-                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))',
-                transition: 'all 0.3s ease'
-              }} />
-              Log a Beer
+              {loading ? (
+                <CircularProgress 
+                  size={60}
+                  sx={{ 
+                    color: 'var(--dark-wood)',
+                    opacity: 0.8
+                  }} 
+                />
+              ) : (
+                <>
+                  <BeerIcon sx={{ 
+                    fontSize: { xs: '4rem', sm: '5rem' },
+                    filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))',
+                    transition: 'all 0.3s ease'
+                  }} />
+                  Log a Beer
+                </>
+              )}
             </Button>
             
-            <QuickLogButton userId={user?.uid} />
+            <QuickLogButton 
+              userId={user?.uid} 
+              onSuccess={(message) => {
+                setSuccessMessage(message);
+                setShowSuccess(true);
+              }}
+              onError={(message) => {
+                setError(message);
+              }}
+            />
           </Box>
 
           <Box 
@@ -197,6 +252,34 @@ export default function Home() {
         >
           Made with 🍺 for beer lovers
         </Typography>
+
+        {/* Success Snackbar */}
+        <Snackbar
+          open={showSuccess}
+          autoHideDuration={3000}
+          onClose={() => setShowSuccess(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert 
+            onClose={() => setShowSuccess(false)} 
+            severity="success"
+            sx={{ width: '100%' }}
+          >
+            {successMessage}
+          </Alert>
+        </Snackbar>
+
+        {/* Loading Backdrop */}
+        <Backdrop
+          sx={{ 
+            color: '#fff', 
+            zIndex: (theme) => theme.zIndex.drawer + 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)'
+          }}
+          open={loading}
+        >
+          <CircularProgress color="inherit" />
+        </Backdrop>
       </Container>
     </>
   );

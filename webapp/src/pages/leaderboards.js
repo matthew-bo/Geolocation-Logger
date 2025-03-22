@@ -12,11 +12,14 @@ import {
   Dialog,
   CircularProgress,
   Alert,
+  Snackbar,
+  Skeleton,
 } from '@mui/material';
 import {
   Add as AddIcon,
   EmojiEvents as TrophyIcon,
   ChevronRight as ChevronRightIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/router';
@@ -46,6 +49,9 @@ export default function Leaderboards() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   // Generate random bubbles
   const bubbles = Array.from({ length: 8 }, (_, i) => ({
@@ -95,13 +101,29 @@ export default function Leaderboards() {
     router.push(`/leaderboards/${groupId}`);
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchUserGroups();
+    setRefreshing(false);
+    setSuccessMessage('Groups refreshed successfully');
+    setShowSuccess(true);
+  };
+
+  const handleGroupCreated = async () => {
+    setCreateDialogOpen(false);
+    await fetchUserGroups();
+    setSuccessMessage('Group created successfully');
+    setShowSuccess(true);
+  };
+
   if (loading) {
     return (
       <Box sx={{ 
         minHeight: '100vh', 
         display: 'flex', 
         alignItems: 'center', 
-        justifyContent: 'center' 
+        justifyContent: 'center',
+        bgcolor: 'var(--background)',
       }}>
         <CircularProgress sx={{ color: 'var(--beer-amber)' }} />
       </Box>
@@ -149,7 +171,20 @@ export default function Leaderboards() {
         </Box>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 4 }}>
+          <Alert 
+            severity="error" 
+            sx={{ mb: 4 }}
+            action={
+              <Button 
+                color="inherit" 
+                size="small" 
+                onClick={fetchUserGroups}
+                startIcon={<RefreshIcon />}
+              >
+                Retry
+              </Button>
+            }
+          >
             {error}
           </Alert>
         )}
@@ -165,17 +200,41 @@ export default function Leaderboards() {
               <Typography variant="h6" color="var(--beer-amber)">
                 Your Groups
               </Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => setCreateDialogOpen(true)}
-                sx={{
-                  bgcolor: 'var(--beer-amber)',
-                  '&:hover': { bgcolor: 'var(--copper)' }
-                }}
-              >
-                Create Group
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  sx={{
+                    borderColor: 'var(--beer-amber)',
+                    color: 'var(--beer-amber)',
+                    '&:hover': { borderColor: 'var(--copper)' }
+                  }}
+                >
+                  {refreshing ? (
+                    <>
+                      <CircularProgress size={20} sx={{ mr: 1 }} />
+                      Refreshing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshIcon sx={{ mr: 1 }} />
+                      Refresh
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => setCreateDialogOpen(true)}
+                  sx={{
+                    bgcolor: 'var(--beer-amber)',
+                    '&:hover': { bgcolor: 'var(--copper)' }
+                  }}
+                >
+                  Create Group
+                </Button>
+              </Box>
             </Box>
 
             <Fade in={true}>
@@ -225,8 +284,24 @@ export default function Leaderboards() {
       <CreateGroupDialog
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
-        onGroupCreated={fetchUserGroups}
+        onGroupCreated={handleGroupCreated}
       />
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={showSuccess}
+        autoHideDuration={3000}
+        onClose={() => setShowSuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setShowSuccess(false)} 
+          severity="success"
+          sx={{ width: '100%' }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 } 

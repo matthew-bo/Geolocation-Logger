@@ -9,6 +9,12 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -27,6 +33,8 @@ export default function LocationEdit({ placeInfo, onLocationUpdated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
 
   useEffect(() => {
     loadLocationName();
@@ -48,84 +56,62 @@ export default function LocationEdit({ placeInfo, onLocationUpdated }) {
       setCustomName(displayName);
     } catch (err) {
       console.error('Error loading location name:', err);
-      setError('Failed to load location name');
+      setError('Failed to load location name. Please try again.');
     } finally {
       setLoadingInitial(false);
     }
   };
 
   const handleSave = async () => {
-    if (!originalAddress || !user) return;
-    
-    const trimmedName = customName.trim();
-    if (trimmedName.length === 0 || trimmedName.length > 40) {
-      setError('Location name must be between 1 and 40 characters');
+    if (!customName.trim()) {
+      setError('Please enter a location name');
       return;
     }
 
     setLoading(true);
     setError(null);
-
     try {
-      if (trimmedName === originalAddress) {
-        await locationService.removeLocationAlias(user.uid, originalAddress);
-      } else {
-        await locationService.setLocationAlias(user.uid, originalAddress, trimmedName);
-      }
-
-      setDisplayName(trimmedName);
+      await locationService.setLocationAlias(user.uid, originalAddress, customName.trim());
+      setDisplayName(customName);
       setIsEditing(false);
+      setShowSuccess(true);
       if (onLocationUpdated) {
         onLocationUpdated();
       }
     } catch (err) {
-      console.error('Error saving location alias:', err);
-      setError('Failed to save location name');
+      console.error('Error saving location name:', err);
+      setError('Failed to save location name. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleRestore = async () => {
-    if (!originalAddress || !user) return;
-
     setLoading(true);
     setError(null);
-
     try {
       await locationService.removeLocationAlias(user.uid, originalAddress);
       setDisplayName(originalAddress);
       setCustomName(originalAddress);
       setIsEditing(false);
+      setShowSuccess(true);
       if (onLocationUpdated) {
         onLocationUpdated();
       }
     } catch (err) {
       console.error('Error restoring location name:', err);
-      setError('Failed to restore original location name');
+      setError('Failed to restore original name. Please try again.');
     } finally {
       setLoading(false);
     }
+    setShowRestoreConfirm(false);
   };
-
-  const handleCloseError = () => {
-    setError(null);
-  };
-
-  const handleLocationUpdated = () => {
-    // Refresh all markers to update their display names
-    if (onLocationUpdated) {
-      onLocationUpdated();
-    }
-  };
-
-  if (!placeInfo) return null;
 
   if (loadingInitial) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <CircularProgress size={16} sx={{ color: 'var(--beer-amber)' }} />
-        <Typography variant="body2" color="var(--text-secondary)">
+        <CircularProgress size={20} sx={{ color: 'var(--beer-amber)' }} />
+        <Typography variant="body2" color="text.secondary">
           Loading location...
         </Typography>
       </Box>
@@ -134,145 +120,65 @@ export default function LocationEdit({ placeInfo, onLocationUpdated }) {
 
   return (
     <>
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: 1,
-        flexWrap: 'wrap',
-        width: '100%'
-      }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         {isEditing ? (
           <ClickAwayListener onClickAway={() => !loading && setIsEditing(false)}>
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 1,
-              width: '100%',
-              flexWrap: { xs: 'wrap', sm: 'nowrap' }
-            }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
               <TextField
                 size="small"
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
-                inputProps={{ 
-                  maxLength: 40,
-                  style: { fontSize: '0.875rem' }
-                }}
-                placeholder="Enter location name"
                 disabled={loading}
+                error={!!error}
+                helperText={error}
                 autoFocus
-                sx={{
-                  flexGrow: 1,
-                  minWidth: { xs: '180px', sm: 'auto' },
-                  '& .MuiInputBase-input': {
+                fullWidth
+                sx={{ 
+                  '& .MuiInputBase-root': {
                     color: 'var(--text-primary)',
-                    height: '1.5rem',
-                    padding: '4px 8px',
-                  },
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'var(--glass-background)',
-                    '& fieldset': {
-                      borderColor: 'var(--border-color)',
-                      borderWidth: '1px',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: 'var(--beer-amber)',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: 'var(--beer-amber)',
-                      borderWidth: '1px',
-                    },
-                  },
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                  }
                 }}
               />
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 0.5,
-                ml: { xs: 0, sm: 1 }
-              }}>
-                <Tooltip title={loading ? 'Saving...' : 'Save'}>
-                  <span>
-                    <IconButton 
-                      size="small" 
-                      onClick={handleSave}
-                      disabled={loading}
-                      sx={{ 
-                        color: 'var(--beer-amber)',
-                        bgcolor: 'var(--glass-background)',
-                        '&:hover': {
-                          bgcolor: 'var(--glass-background-hover)',
-                        },
-                        '&.Mui-disabled': {
-                          color: 'var(--text-disabled)',
-                        },
-                      }}
-                    >
-                      {loading ? (
-                        <CircularProgress size={16} sx={{ color: 'var(--beer-amber)' }} />
-                      ) : (
-                        <SaveIcon fontSize="small" />
-                      )}
-                    </IconButton>
-                  </span>
+              <Tooltip title="Save">
+                <IconButton 
+                  onClick={handleSave}
+                  disabled={loading || !customName.trim()}
+                  size="small"
+                >
+                  {loading ? (
+                    <CircularProgress size={20} sx={{ color: 'var(--beer-amber)' }} />
+                  ) : (
+                    <SaveIcon sx={{ color: 'var(--beer-amber)' }} />
+                  )}
+                </IconButton>
+              </Tooltip>
+              {displayName !== originalAddress && (
+                <Tooltip title="Restore original">
+                  <IconButton 
+                    onClick={() => setShowRestoreConfirm(true)}
+                    disabled={loading}
+                    size="small"
+                  >
+                    <RestoreIcon />
+                  </IconButton>
                 </Tooltip>
-                {displayName !== originalAddress && (
-                  <Tooltip title={loading ? 'Restoring...' : 'Restore original address'}>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: loading ? 'var(--text-disabled)' : 'var(--text-secondary)',
-                        cursor: loading ? 'default' : 'pointer',
-                        px: 1,
-                        py: 0.5,
-                        borderRadius: 1,
-                        bgcolor: 'var(--glass-background)',
-                        fontSize: '0.75rem',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        maxWidth: { xs: '120px', sm: '200px' },
-                        '&:hover': {
-                          bgcolor: loading ? 'var(--glass-background)' : 'var(--glass-background-hover)',
-                          textDecoration: loading ? 'none' : 'underline',
-                        },
-                      }}
-                      onClick={() => !loading && handleRestore()}
-                    >
-                      {originalAddress}
-                    </Typography>
-                  </Tooltip>
-                )}
-              </Box>
+              )}
             </Box>
           </ClickAwayListener>
         ) : (
           <>
             <Typography 
               variant="body2" 
-              color="var(--text-secondary)"
-              sx={{
-                maxWidth: '100%',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
+              sx={{ 
+                color: displayName === originalAddress ? 'text.secondary' : 'text.primary',
+                fontStyle: displayName === originalAddress ? 'italic' : 'normal'
               }}
             >
-              {displayName}
+              {displayName || 'Unknown Location'}
             </Typography>
             <Tooltip title="Edit location name">
-              <IconButton
-                size="small"
-                onClick={() => setIsEditing(true)}
-                sx={{ 
-                  color: 'var(--text-secondary)',
-                  bgcolor: 'var(--glass-background)',
-                  '&:hover': {
-                    bgcolor: 'var(--glass-background-hover)',
-                    color: 'var(--beer-amber)',
-                  },
-                }}
-              >
+              <IconButton onClick={() => setIsEditing(true)} size="small">
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -281,36 +187,60 @@ export default function LocationEdit({ placeInfo, onLocationUpdated }) {
       </Box>
 
       <Snackbar
-        open={!!error}
-        autoHideDuration={6000}
-        onClose={handleCloseError}
+        open={showSuccess}
+        autoHideDuration={3000}
+        onClose={() => setShowSuccess(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        sx={{
-          '& .MuiSnackbarContent-root': {
+      >
+        <Alert 
+          onClose={() => setShowSuccess(false)} 
+          severity="success"
+          sx={{ width: '100%' }}
+        >
+          Location name updated successfully
+        </Alert>
+      </Snackbar>
+
+      <Dialog
+        open={showRestoreConfirm}
+        onClose={() => setShowRestoreConfirm(false)}
+        PaperProps={{
+          sx: {
             bgcolor: 'var(--background)',
             color: 'var(--text-primary)',
+            border: '1px solid var(--border-color)',
           }
         }}
       >
-        <Alert 
-          onClose={handleCloseError} 
-          severity="error" 
-          variant="filled"
-          sx={{ 
-            width: '100%',
-            bgcolor: 'var(--background)',
-            color: 'var(--text-primary)',
-            '& .MuiAlert-icon': {
-              color: '#f44336'
-            },
-            '& .MuiAlert-action': {
-              color: 'var(--text-secondary)',
-            }
-          }}
-        >
-          {error}
-        </Alert>
-      </Snackbar>
+        <DialogTitle>Restore Original Name?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: 'var(--text-secondary)' }}>
+            This will remove your custom name and restore the original address. Are you sure?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setShowRestoreConfirm(false)}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleRestore}
+            disabled={loading}
+            sx={{ color: 'var(--beer-amber)' }}
+          >
+            {loading ? (
+              <>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                Restoring...
+              </>
+            ) : (
+              'Restore'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 } 

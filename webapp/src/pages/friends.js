@@ -304,6 +304,11 @@ export default function Friends() {
                   placeholder="Search users by username"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  inputProps={{
+                    maxLength: 50,
+                    pattern: "[A-Za-z0-9_-]*",
+                    title: "Only letters, numbers, underscores, and hyphens are allowed"
+                  }}
                   InputProps={{
                     startAdornment: <SearchIcon sx={{ mr: 1, color: 'var(--text-secondary)' }} />,
                   }}

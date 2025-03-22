@@ -7,7 +7,7 @@ import { getAnalytics } from 'firebase/analytics';
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyC3B9owv3AbK9pupIxlrvQYNdsWmQrIxIw",
-  authDomain: "geolocation-c8fa1.firebaseapp.com",
+  authDomain: "ihadabeer.com",
   projectId: "geolocation-c8fa1",
   storageBucket: "geolocation-c8fa1.appspot.com",
   messagingSenderId: "437052534338",

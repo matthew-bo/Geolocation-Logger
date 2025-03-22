@@ -12,6 +12,9 @@ import {
   Box,
   Typography,
   IconButton,
+  useMediaQuery,
+  useTheme,
+  CircularProgress
 } from '@mui/material';
 import { 
   LocalBar as DrinkIcon,
@@ -22,7 +25,6 @@ import {
 import mapboxgl from 'mapbox-gl';
 import { useRouter } from 'next/router';
 
-// Replace this with your actual Mapbox token
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
 export default function MapComponent({ 
@@ -45,15 +47,11 @@ export default function MapComponent({
     pitch: 0
   });
   
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const router = useRouter();
 
-  // Debug logging
   useEffect(() => {
-    console.log("MapComponent mounted");
-    console.log("Drinks data:", drinks);
-    console.log("Map reference:", mapRef.current);
-    console.log("Mapbox token available:", !!MAPBOX_TOKEN);
-    
     if (!MAPBOX_TOKEN) {
       setMapError("Mapbox token not found. Please check your environment variables.");
     }
@@ -61,12 +59,12 @@ export default function MapComponent({
 
   // Fit map to markers on load
   useEffect(() => {
-    if (drinks.length > 0 && mapRef.current) {
+    if (mapRef.current && drinks.length > 0) {
       try {
         const bounds = new mapboxgl.LngLatBounds();
         let hasValidCoordinates = false;
 
-        drinks.forEach(drink => {
+        [...drinks, ...friendDrinks].forEach(drink => {
           if (drink.location && 
               drink.location.lat && 
               !isNaN(drink.location.lat) && 
@@ -79,7 +77,12 @@ export default function MapComponent({
 
         if (hasValidCoordinates) {
           mapRef.current.fitBounds(bounds, {
-            padding: 50,
+            padding: {
+              top: isMobile ? 180 : 200,
+              bottom: 50,
+              left: 50,
+              right: 50
+            },
             duration: 1000
           });
         }
@@ -88,7 +91,7 @@ export default function MapComponent({
         setMapError("Error loading map. Please try refreshing the page.");
       }
     }
-  }, [drinks]);
+  }, [drinks, friendDrinks, isMobile]);
 
   // Handle click on edit location button in popup
   const handleEditLocationClick = (drink, e) => {
@@ -145,9 +148,13 @@ export default function MapComponent({
           setMapError("Error loading map. Please try refreshing the page.");
         }}
       >
-        <GeolocateControl position="top-right" />
-        <FullscreenControl position="top-right" />
-        <NavigationControl position="top-right" />
+        <GeolocateControl 
+          position={isMobile ? "bottom-right" : "top-right"}
+          positionOptions={{ enableHighAccuracy: true }}
+          trackUserLocation={true}
+        />
+        <FullscreenControl position={isMobile ? "bottom-right" : "top-right"} />
+        <NavigationControl position={isMobile ? "bottom-right" : "top-right"} />
         <ScaleControl position="bottom-right" />
         
         {drinks.map((drink) => (
@@ -193,7 +200,6 @@ export default function MapComponent({
           ) : null
         ))}
 
-        {/* Friend drinks markers */}
         {friendDrinks.map((drink) => (
           drink.location && 
           drink.location.lat && 
@@ -213,8 +219,8 @@ export default function MapComponent({
                 sx={{
                   width: getMarkerSize(viewport.zoom),
                   height: getMarkerSize(viewport.zoom),
-                  backgroundColor: `${getMarkerColor(drink)}80`,
-                  border: `2px solid ${getMarkerColor(drink)}`,
+                  backgroundColor: `${getMarkerColor(drink, 'friend')}80`,
+                  border: `2px solid ${getMarkerColor(drink, 'friend')}`,
                   borderRadius: '50%',
                   cursor: 'pointer',
                   display: 'flex',
@@ -222,9 +228,9 @@ export default function MapComponent({
                   justifyContent: 'center',
                   transition: 'all 0.3s ease',
                   '&:hover': {
-                    backgroundColor: getMarkerColor(drink),
+                    backgroundColor: getMarkerColor(drink, 'friend'),
                     transform: 'scale(1.1)',
-                    boxShadow: `0 0 10px ${getMarkerColor(drink)}80`,
+                    boxShadow: `0 0 10px ${getMarkerColor(drink, 'friend')}80`,
                   },
                 }}
               >
@@ -250,9 +256,15 @@ export default function MapComponent({
               'aria-label': 'Close popup'
             }}
             className="beer-popup"
+            maxWidth={isMobile ? "280px" : "320px"}
+            offset={isMobile ? 20 : 25}
           >
             <Box sx={{ p: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 'bold', 
+                fontSize: isMobile ? '0.9rem' : '1rem',
+                pr: 2 // Space for close button
+              }}>
                 {selectedDrink.brand || 'Unknown Beer'}
               </Typography>
               
@@ -260,17 +272,18 @@ export default function MapComponent({
                 display: 'flex', 
                 justifyContent: 'space-between', 
                 alignItems: 'center',
-                mt: 0.5
+                mt: 0.5,
+                flexWrap: 'wrap',
+                gap: 0.5
               }}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
                   {selectedDrink.drinkType || 'Unknown Type'} • {selectedDrink.containerType || 'Unknown Container'}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
                   Rating: {selectedDrink.rating || 0}/5
                 </Typography>
               </Box>
               
-              {/* Location information */}
               <Box sx={{ 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -280,12 +293,12 @@ export default function MapComponent({
                 borderRadius: 1
               }}>
                 <LocationIcon sx={{ 
-                  fontSize: '1rem', 
+                  fontSize: isMobile ? '0.9rem' : '1rem', 
                   color: 'var(--beer-amber)',
                   mr: 0.5 
                 }} />
                 <Typography variant="body2" sx={{ 
-                  fontSize: '0.8rem',
+                  fontSize: isMobile ? '0.75rem' : '0.8rem',
                   flex: 1
                 }}>
                   {selectedDrink.placeInfo ? (
@@ -306,13 +319,20 @@ export default function MapComponent({
                       '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } 
                     }}
                   >
-                    <EditIcon sx={{ fontSize: '0.8rem' }} />
+                    <EditIcon sx={{ fontSize: isMobile ? '0.7rem' : '0.8rem' }} />
                   </IconButton>
                 )}
               </Box>
               
-              {/* Date/time */}
-              <Typography variant="caption" display="block" sx={{ mt: 1, color: 'text.secondary' }}>
+              <Typography 
+                variant="caption" 
+                display="block" 
+                sx={{ 
+                  mt: 1, 
+                  color: 'text.secondary',
+                  fontSize: isMobile ? '0.65rem' : '0.75rem'
+                }}
+              >
                 {selectedDrink.timestamp instanceof Date 
                   ? selectedDrink.timestamp.toLocaleString()
                   : (

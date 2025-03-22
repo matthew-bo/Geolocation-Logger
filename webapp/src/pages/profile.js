@@ -373,7 +373,9 @@ export default function Profile() {
                           <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
                             <LocationIcon sx={{ fontSize: '0.9rem', color: 'var(--text-secondary)', mr: 0.5 }} />
                             <Typography variant="body2" color="var(--text-secondary)">
-                              {drink.placeInfo.placeName || 'Unknown Location'}
+                              {drink.placeInfo.neighborhood ? 
+                                `${drink.placeInfo.neighborhood}, ${drink.placeInfo.city}` : 
+                                drink.placeInfo.address || 'Unknown Location'}
                             </Typography>
                           </Box>
                         )}

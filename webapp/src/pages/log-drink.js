@@ -28,6 +28,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../config/firebase';
 import { collection, addDoc, query, where, getDocs, serverTimestamp, writeBatch, doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { locationService } from '../services/locationService';
+import { toast } from 'react-toastify';
 
 // Custom styled Rating component
 const BeerRating = styled(Rating)({
@@ -73,11 +74,11 @@ export default function LogDrink() {
   const [customAmount, setCustomAmount] = useState('');
   const [formData, setFormData] = useState({
     brand: '',
-    drinkType: '',
     containerType: '',
     amount: 12, // Default to standard size
     rating: 0,
     notes: '',
+    method: '', // Add method to form data
   });
 
   // Generate random bubbles
@@ -128,6 +129,19 @@ export default function LogDrink() {
     e.preventDefault();
     if (!location) return;
 
+    // Use customAmount if "Other" is selected
+    const finalAmount = formData.amount === 0 && customAmount ? Number(customAmount) : formData.amount;
+
+    // Validate required fields
+    if (!formData.brand || !formData.containerType || (formData.amount === 0 && !customAmount)) {
+      toast.error('Please fill in all required fields', {
+        position: "top-center",
+        autoClose: 3000,
+        theme: "dark"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       // Try to get place information from coordinates
@@ -143,6 +157,7 @@ export default function LogDrink() {
       // Log the drink with place information if available
       const docRef = await addDoc(collection(db, 'drinks'), {
         ...formData,
+        amount: finalAmount, // Use the finalAmount here
         userId: user.uid,
         location: location,
         timestamp: serverTimestamp(),
@@ -349,8 +364,9 @@ export default function LogDrink() {
   const handleAmountChange = (event) => {
     const selectedValue = event.target.value;
     if (selectedValue === 0) {
-      // If "Other" is selected, don't update the amount yet
+      // If "Other" is selected, keep amount as 0 to keep field visible
       setFormData(prev => ({ ...prev, amount: 0 }));
+      setCustomAmount(''); // Clear custom amount when switching to "Other"
     } else {
       setFormData(prev => ({ ...prev, amount: selectedValue }));
       setCustomAmount(''); // Clear custom amount when selecting a preset size
@@ -359,9 +375,14 @@ export default function LogDrink() {
 
   const handleCustomAmountChange = (event) => {
     const value = event.target.value;
-    setCustomAmount(value);
-    if (value && !isNaN(value)) {
-      setFormData(prev => ({ ...prev, amount: Number(value) }));
+    // Only allow numbers up to 999
+    if (value === '' || (Number(value) <= 999 && value.length <= 3)) {
+      setCustomAmount(value);
+      // Store the custom amount in formData.amount only if it's a valid number
+      if (value && !isNaN(value)) {
+        // Keep formData.amount as 0 to maintain field visibility
+        setFormData(prev => ({ ...prev, amount: 0 }));
+      }
     }
   };
 
@@ -425,33 +446,20 @@ export default function LogDrink() {
                 label="Beer Brand"
                 name="brand"
                 required
+                inputProps={{
+                  ...params.inputProps,
+                  maxLength: 100,
+                  pattern: "[A-Za-z0-9 '&-]*",
+                  title: "Only letters, numbers, spaces, apostrophes, ampersands, and hyphens are allowed"
+                }}
                 sx={{ mb: 3 }}
-                onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^A-Za-z0-9 '&-]/g, '');
+                  setFormData(prev => ({ ...prev, brand: value }));
+                }}
               />
             )}
           />
-
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <InputLabel>Beer Type</InputLabel>
-            <Select
-              name="drinkType"
-              value={formData.drinkType}
-              onChange={handleChange}
-              required
-              sx={{
-                background: 'var(--glass-background)',
-                backdropFilter: 'blur(10px)',
-              }}
-            >
-              <MenuItem value="lager">Lager</MenuItem>
-              <MenuItem value="ale">Ale</MenuItem>
-              <MenuItem value="ipa">IPA</MenuItem>
-              <MenuItem value="stout">Stout</MenuItem>
-              <MenuItem value="porter">Porter</MenuItem>
-              <MenuItem value="wheat">Wheat Beer</MenuItem>
-              <MenuItem value="other">Other</MenuItem>
-            </Select>
-          </FormControl>
 
           <FormControl fullWidth sx={{ mb: 3 }}>
             <InputLabel>Container</InputLabel>
@@ -479,6 +487,7 @@ export default function LogDrink() {
               value={formData.amount === 0 ? 0 : formData.amount}
               onChange={handleAmountChange}
               label="Amount"
+              required
             >
               {BEER_SIZES.map((size) => (
                 <MenuItem key={size.value} value={size.value}>
@@ -496,12 +505,19 @@ export default function LogDrink() {
               type="number"
               value={customAmount}
               onChange={handleCustomAmountChange}
-              InputProps={{ inputProps: { min: 1 } }}
+              InputProps={{ 
+                inputProps: { 
+                  min: 1,
+                  max: 999,
+                  maxLength: 3
+                } 
+              }}
+              required
             />
           )}
 
           <Box sx={{ mb: 3, textAlign: 'center' }}>
-            <Typography gutterBottom>Rating</Typography>
+            <Typography gutterBottom color="var(--text-secondary)">Rating (Optional)</Typography>
             <BeerRating
               name="rating"
               value={formData.rating}
@@ -516,9 +532,29 @@ export default function LogDrink() {
             multiline
             rows={3}
             name="notes"
-            label="Tasting Notes"
+            label="Tasting Notes (Optional)"
             value={formData.notes}
             onChange={handleChange}
+            inputProps={{
+              maxLength: 500
+            }}
+            helperText={`${formData.notes?.length || 0}/500`}
+            sx={{ mb: 3 }}
+          />
+
+          <TextField
+            fullWidth
+            name="method"
+            label="Method (Optional)"
+            value={formData.method}
+            onChange={handleChange}
+            placeholder="e.g., funnel, shotgun, chug"
+            inputProps={{
+              maxLength: 50,
+              pattern: "[A-Za-z0-9 -]*",
+              title: "Only letters, numbers, spaces, and hyphens are allowed"
+            }}
+            helperText={`${formData.method?.length || 0}/50`}
             sx={{ mb: 3 }}
           />
 

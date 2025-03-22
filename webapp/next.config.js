@@ -8,7 +8,7 @@ const nextConfig = {
   // This is important for Firebase hosting
   trailingSlash: true,
   env: {
-    MAPBOX_ACCESS_TOKEN: 'pk.eyJ1IjoibWJvMTE1NzAiLCJhIjoiY204MjZjbWZrMHF4czJqb2Ruczd1aHJlcSJ9.cYv9mTPeUQSR4XVDS9FBpQ'
+    NEXT_PUBLIC_MAPBOX_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_TOKEN
   }
 };
 

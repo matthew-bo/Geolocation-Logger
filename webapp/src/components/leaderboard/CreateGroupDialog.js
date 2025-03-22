@@ -157,6 +157,12 @@ export default function CreateGroupDialog({ open, onClose, onGroupCreated }) {
           fullWidth
           value={name}
           onChange={(e) => setName(e.target.value)}
+          inputProps={{
+            maxLength: 50,
+            pattern: "[A-Za-z0-9 -]*",
+            title: "Only letters, numbers, spaces, and hyphens are allowed"
+          }}
+          helperText={`${name.length}/50`}
           sx={{ mb: 2 }}
         />
 

@@ -14,11 +14,13 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
+import ResetPasswordDialog from '../components/ResetPasswordDialog';
 
 export default function Login() {
   const { login } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const {
     register,
     handleSubmit,
@@ -55,7 +57,15 @@ export default function Login() {
   return (
     <Container maxWidth="sm">
       <Box sx={{ mt: 8, mb: 4 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: 4,
+            bgcolor: 'var(--background)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-color)',
+          }}
+        >
           <Typography variant="h4" component="h1" gutterBottom align="center">
             Login
           </Typography>
@@ -75,6 +85,19 @@ export default function Login() {
               })}
               error={!!errors.email}
               helperText={errors.email?.message}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': {
+                    borderColor: 'var(--border-color)',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'var(--beer-amber)',
+                  },
+                },
+                '& .MuiInputLabel-root': {
+                  color: 'var(--text-secondary)',
+                },
+              }}
             />
             <TextField
               margin="normal"
@@ -91,7 +114,39 @@ export default function Login() {
               })}
               error={!!errors.password}
               helperText={errors.password?.message}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': {
+                    borderColor: 'var(--border-color)',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'var(--beer-amber)',
+                  },
+                },
+                '& .MuiInputLabel-root': {
+                  color: 'var(--text-secondary)',
+                },
+              }}
             />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+              <MuiLink
+                component="button"
+                variant="body2"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setResetPasswordOpen(true);
+                }}
+                sx={{
+                  color: 'var(--beer-amber)',
+                  textDecoration: 'none',
+                  '&:hover': {
+                    textDecoration: 'underline',
+                  },
+                }}
+              >
+                Forgot password?
+              </MuiLink>
+            </Box>
             <Button
               type="submit"
               fullWidth
@@ -99,9 +154,10 @@ export default function Login() {
               sx={{ 
                 mt: 3, 
                 mb: 2,
-                bgcolor: loading ? 'grey.500' : 'primary.main',
+                bgcolor: loading ? 'grey.500' : 'var(--beer-amber)',
+                color: 'var(--dark-wood)',
                 '&:hover': {
-                  bgcolor: loading ? 'grey.600' : 'primary.dark'
+                  bgcolor: loading ? 'grey.600' : 'var(--copper)'
                 }
               }}
               disabled={loading}
@@ -116,9 +172,19 @@ export default function Login() {
               )}
             </Button>
             <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="body2">
+              <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
                 Don't have an account?{' '}
-                <MuiLink component={Link} href="/register">
+                <MuiLink 
+                  component={Link} 
+                  href="/register"
+                  sx={{
+                    color: 'var(--beer-amber)',
+                    textDecoration: 'none',
+                    '&:hover': {
+                      textDecoration: 'underline',
+                    },
+                  }}
+                >
                   Sign up
                 </MuiLink>
               </Typography>
@@ -126,6 +192,11 @@ export default function Login() {
           </form>
         </Paper>
       </Box>
+
+      <ResetPasswordDialog
+        open={resetPasswordOpen}
+        onClose={() => setResetPasswordOpen(false)}
+      />
     </Container>
   );
 } 

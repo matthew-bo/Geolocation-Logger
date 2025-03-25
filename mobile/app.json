@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "DrinkTracker",
+    "slug": "drink-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pie1man49.drinktracker",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "DrinkTracker needs access to location to show nearby friends and venues.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "DrinkTracker needs access to location to show nearby friends and venues.",
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "location",
+          "fetch"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.pie1man49.drinktracker",
+      "versionCode": 1,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow DrinkTracker to use your location to show nearby friends and venues."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "36e6d063-253c-4edb-b520-a6ee9e8b1925"
+      }
+    },
+    "owner": "pie1man49"
+  }
+}

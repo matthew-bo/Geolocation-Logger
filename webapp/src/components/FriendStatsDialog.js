@@ -94,10 +94,10 @@ export default function FriendStatsDialog({ open, onClose, friend }) {
             margin: '0 auto 1rem',
           }}
         >
-          {friend.username?.[0]?.toUpperCase() || friend.email?.[0]?.toUpperCase()}
+          {friend.username?.[0]?.toUpperCase() || friend.displayName?.[0]?.toUpperCase() || '?'}
         </Avatar>
         <Typography variant="h5" className="logo-text">
-          {friend.username || friend.email?.split('@')[0]}
+          {friend.username || friend.displayName || 'Anonymous Beer Lover'}
         </Typography>
       </DialogTitle>
 

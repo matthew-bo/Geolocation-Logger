@@ -37,6 +37,8 @@ import {
   Public as GlobeIcon,
   LocationCity as CityIcon,
   Apartment as StateIcon,
+  ArrowBack,
+  FileDownload as FileDownloadIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../config/firebase';
@@ -261,25 +263,22 @@ export default function Profile() {
     return new Date(timestamp).toLocaleDateString();
   };
 
-  const handleExport = async (format) => {
-    try {
-      const data = await exportService.exportData(targetUserId, format);
-      const blob = new Blob([data], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `drink-history.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      setSuccessMessage('Data exported successfully');
-      setShowSuccess(true);
-    } catch (error) {
-      console.error('Error exporting data:', error);
-      setError('Failed to export data. Please try again.');
+  const handleExport = (format) => {
+    switch (format) {
+      case 'excel':
+        exportService.exportToExcel(allDrinks);
+        break;
+      case 'csv':
+        exportService.exportToCsv(allDrinks);
+        break;
+      case 'json':
+        exportService.exportToJson(allDrinks);
+        break;
+      default:
+        console.error('Unsupported export format');
     }
+    setSuccessMessage(`Successfully exported data to ${format.toUpperCase()}`);
+    setShowSuccess(true);
   };
 
   if (loading) {
@@ -316,8 +315,28 @@ export default function Profile() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Back Button */}
+      {router.query.userId && (
+        <Button
+          onClick={() => router.push('/friends')}
+          startIcon={<ArrowBack />}
+          sx={{
+            mb: 2,
+            color: 'var(--beer-amber)',
+            '&:hover': { bgcolor: 'rgba(244, 164, 96, 0.1)' }
+          }}
+        >
+          Back to Friends
+        </Button>
+      )}
+
       {/* Profile Section */}
-      <Card sx={{ mb: 4, position: 'relative' }}>
+      <Card sx={{ 
+        mb: 4, 
+        position: 'relative',
+        bgcolor: 'var(--beer-dark)',
+        border: '1px solid var(--beer-amber)'
+      }}>
         {sectionLoading.profile && (
           <Box sx={{ 
             position: 'absolute', 
@@ -366,7 +385,11 @@ export default function Profile() {
           { key: 'favoriteBeer', label: 'Favorite Beer', value: stats.favoriteBeer || 'None yet' }
         ].map((stat) => (
           <Grid item xs={12} sm={6} md={3} key={stat.key}>
-            <Card sx={{ position: 'relative' }}>
+            <Card sx={{ 
+              position: 'relative',
+              bgcolor: 'var(--beer-dark)',
+              border: '1px solid var(--beer-amber)'
+            }}>
               {sectionLoading.stats && (
                 <Box sx={{ 
                   position: 'absolute', 
@@ -531,7 +554,12 @@ export default function Profile() {
       </Card>
 
       {/* Drink Analytics Section */}
-      <Card sx={{ mb: 4, position: 'relative' }}>
+      <Card sx={{ 
+        mb: 4, 
+        position: 'relative',
+        bgcolor: 'var(--beer-dark)',
+        border: '1px solid var(--beer-amber)'
+      }}>
         {sectionLoading.calendar && (
           <Box sx={{ 
             position: 'absolute', 
@@ -548,7 +576,7 @@ export default function Profile() {
             <CircularProgress sx={{ color: 'var(--beer-amber)' }} />
           </Box>
         )}
-        <Box className="premium-card" sx={{ p: 4 }}>
+        <Box sx={{ p: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" color="var(--beer-amber)">
               Drink Analytics
@@ -558,8 +586,13 @@ export default function Profile() {
         </Box>
       </Card>
 
-      {/* Recent Drinks Section */}
-      <Card sx={{ mb: 4, position: 'relative' }}>
+      {/* Recent Activity Section */}
+      <Card sx={{ 
+        mb: 4, 
+        position: 'relative',
+        bgcolor: 'var(--beer-dark)',
+        border: '1px solid var(--beer-amber)'
+      }}>
         {sectionLoading.recent && (
           <Box sx={{ 
             position: 'absolute', 
@@ -576,7 +609,7 @@ export default function Profile() {
             <CircularProgress sx={{ color: 'var(--beer-amber)' }} />
           </Box>
         )}
-        <Box className="premium-card" sx={{ p: 4 }}>
+        <Box sx={{ p: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" color="var(--beer-amber)">
               Recent Activity
@@ -648,6 +681,48 @@ export default function Profile() {
           )}
         </Box>
       </Card>
+
+      {/* Export Section */}
+      {isOwnProfile && (
+        <Card sx={{ 
+          mb: 4, 
+          position: 'relative',
+          bgcolor: 'var(--beer-dark)',
+          border: '1px solid var(--beer-amber)'
+        }}>
+          <Box sx={{ p: 4 }}>
+            <Typography variant="h6" color="var(--beer-amber)" gutterBottom>
+              Export Drink History
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant="contained"
+                onClick={() => handleExport('excel')}
+                sx={{ bgcolor: 'var(--beer-amber)', '&:hover': { bgcolor: 'var(--beer-amber-dark)' } }}
+                startIcon={<FileDownloadIcon />}
+              >
+                Export to Excel
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleExport('csv')}
+                sx={{ bgcolor: 'var(--beer-amber)', '&:hover': { bgcolor: 'var(--beer-amber-dark)' } }}
+                startIcon={<FileDownloadIcon />}
+              >
+                Export to CSV
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleExport('json')}
+                sx={{ bgcolor: 'var(--beer-amber)', '&:hover': { bgcolor: 'var(--beer-amber-dark)' } }}
+                startIcon={<FileDownloadIcon />}
+              >
+                Export to JSON
+              </Button>
+            </Box>
+          </Box>
+        </Card>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog

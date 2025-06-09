@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Container,
   Box,
@@ -88,22 +88,24 @@ const containerTypes = [
 
 // Custom styled components
 const FilterBar = styled(Box)(({ theme }) => ({
-  position: 'absolute',
-  top: theme.spacing(2),
-  right: theme.spacing(2),
-  zIndex: 1,
+  position: 'relative',
+  width: '100%',
   backgroundColor: 'var(--background)',
-  padding: theme.spacing(2),
+  padding: theme.spacing(3),
   borderRadius: theme.shape.borderRadius,
   boxShadow: theme.shadows[4],
   border: '1px solid var(--border-color)',
-  maxWidth: '300px',
-  width: '90%',
+  marginBottom: theme.spacing(2),
+  maxWidth: '800px',
+  margin: '0 auto',
 }));
 
 const FilterGrid = styled(Grid)(({ theme }) => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, 1fr)',
   gap: theme.spacing(2),
   [theme.breakpoints.down('sm')]: {
+    gridTemplateColumns: '1fr',
     gap: theme.spacing(1),
   },
 }));
@@ -124,7 +126,7 @@ const TimeSlider = styled(Slider)({
 const FilterToggleButton = styled(Button)(({ theme }) => ({
   width: '100%',
   marginBottom: theme.spacing(2),
-  justifyContent: 'flex-start',
+  justifyContent: 'center',
   padding: theme.spacing(1, 2),
   background: 'var(--glass-background)',
   backdropFilter: 'blur(10px)',
@@ -245,11 +247,20 @@ export default function MapPage() {
   const handleFilterChange = (field, value) => {
     setFilters(prev => {
       const newFilters = { ...prev };
-      if (Array.isArray(value)) {
+      
+      // Handle date fields differently
+      if (field === 'startDate' || field === 'endDate') {
         newFilters[field] = value;
-      } else {
+      }
+      // Handle array fields
+      else if (Array.isArray(value)) {
+        newFilters[field] = value;
+      }
+      // Handle single value fields
+      else {
         newFilters[field] = [value];
       }
+      
       return newFilters;
     });
   };
@@ -316,27 +327,52 @@ export default function MapPage() {
     setFilteredBrandOptions(filtered);
   };
 
-  const filteredDrinks = drinks.filter(drink => {
-    return (
-      (filters.drinkType.includes('All Drink Types') || filters.drinkType.includes(drink.type)) &&
-      (filters.container.includes('All Containers') || filters.container.includes(drink.containerType)) &&
-      (filters.brand.includes('All Brands') || filters.brand.includes(drink.brand)) &&
-      (filters.rating.includes('All Ratings') || filters.rating.includes(drink.rating)) &&
-      (filters.method.includes('All Methods') || filters.method.includes(drink.method)) &&
-      (!filters.startDate || new Date(drink.timestamp.toDate()) >= filters.startDate) &&
-      (!filters.endDate || new Date(drink.timestamp.toDate()) <= filters.endDate)
-    );
-  });
+  // Memoize filtered results
+  const filteredDrinks = useMemo(() => {
+    const filterSet = {
+      drinkType: new Set(filters.drinkType),
+      container: new Set(filters.container),
+      brand: new Set(filters.brand),
+      rating: new Set(filters.rating),
+      method: new Set(filters.method)
+    };
 
-  const filteredFriendDrinks = friendDrinks.filter(drink => {
-    if (filters.drinkType !== 'All Drink Types' && drink.type !== filters.drinkType) return false;
-    if (filters.container && drink.container !== filters.container) return false;
-    if (filters.brand && !drink.brand?.toLowerCase().includes(filters.brand.toLowerCase())) return false;
-    if (filters.rating && drink.rating !== parseInt(filters.rating)) return false;
-    if (filters.startDate && new Date(drink.timestamp) < filters.startDate) return false;
-    if (filters.endDate && new Date(drink.timestamp) > filters.endDate) return false;
-    return true;
-  });
+    return drinks.filter(drink => {
+      return (
+        (filterSet.drinkType.has('All Drink Types') || filterSet.drinkType.has(drink.type)) &&
+        (filterSet.container.has('All Containers') || filterSet.container.has(drink.containerType)) &&
+        (filterSet.brand.has('All Brands') || filterSet.brand.has(drink.brand)) &&
+        (filterSet.rating.has('All Ratings') || filterSet.rating.has(drink.rating)) &&
+        (filterSet.method.has('All Methods') || filterSet.method.has(drink.method)) &&
+        (!filters.startDate || new Date(drink.timestamp.toDate()) >= filters.startDate) &&
+        (!filters.endDate || new Date(drink.timestamp.toDate()) <= filters.endDate)
+      );
+    });
+  }, [drinks, filters]);
+
+  const filteredFriendDrinks = useMemo(() => {
+    if (!showFriendLogs) return [];
+    
+    const filterSet = {
+      drinkType: new Set(filters.drinkType),
+      container: new Set(filters.container),
+      brand: new Set(filters.brand),
+      rating: new Set(filters.rating),
+      method: new Set(filters.method)
+    };
+
+    return friendDrinks.filter(drink => {
+      return (
+        (filterSet.drinkType.has('All Drink Types') || filterSet.drinkType.has(drink.type)) &&
+        (filterSet.container.has('All Containers') || filterSet.container.has(drink.containerType)) &&
+        (filterSet.brand.has('All Brands') || filterSet.brand.has(drink.brand)) &&
+        (filterSet.rating.has('All Ratings') || filterSet.rating.has(drink.rating)) &&
+        (filterSet.method.has('All Methods') || filterSet.method.has(drink.method)) &&
+        (!filters.startDate || new Date(drink.timestamp) >= filters.startDate) &&
+        (!filters.endDate || new Date(drink.timestamp) <= filters.endDate)
+      );
+    });
+  }, [friendDrinks, filters, showFriendLogs]);
 
   const handleDateRangeChange = (event, newValue) => {
     setDateRange(newValue);
@@ -411,41 +447,61 @@ export default function MapPage() {
             onClick={() => setShowFilters(!showFilters)}
             startIcon={showFilters ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             endIcon={<FilterIcon />}
+            sx={{
+              maxWidth: '100%',
+              margin: '0 auto',
+              mb: showFilters ? 2 : 0
+            }}
+            aria-expanded={showFilters}
+            aria-controls="filter-panel"
+            aria-label="Toggle filter panel"
           >
             Filters {activeFilters > 0 && `(${activeFilters})`}
           </FilterToggleButton>
 
-          <Collapse in={showFilters}>
+          <Collapse in={showFilters} id="filter-panel" role="region" aria-label="Filter options">
             <FilterBar>
-              <FilterGrid container spacing={2}>
-                <Grid item xs={12} sm={6} md={4}>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                mb: 3, 
+                gap: 2,
+                borderBottom: '1px solid var(--border-color)',
+                pb: 2
+              }}>
+                <Typography variant="h6" sx={{ flex: 1 }}>Map Filters</Typography>
+                {activeFilters > 0 && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={clearFilters}
+                    startIcon={<ClearIcon />}
+                    sx={{ 
+                      borderColor: 'var(--beer-amber)', 
+                      color: 'var(--beer-amber)',
+                      '&:hover': { 
+                        borderColor: 'var(--copper)', 
+                        background: 'rgba(255,255,255,0.03)' 
+                      }
+                    }}
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </Box>
+
+              <FilterGrid>
+                <Grid item>
                   <FormControl fullWidth>
-                    <InputLabel>Drink Type</InputLabel>
+                    <InputLabel id="drink-type-label">Drink Type</InputLabel>
                     <Select
+                      labelId="drink-type-label"
                       multiple
                       value={filters.drinkType}
                       onChange={(e) => handleFilterChange('drinkType', e.target.value)}
                       label="Drink Type"
                       renderValue={(selected) => selected.join(', ')}
-                      onOpen={(e) => handleFilterClick(e, 'drinkType')}
-                      onClose={() => handleFilterClose('drinkType')}
-                      MenuProps={{
-                        PaperProps: {
-                          style: {
-                            maxHeight: 300,
-                            width: 250,
-                          },
-                        },
-                        anchorEl: anchorEl.drinkType,
-                        anchorOrigin: {
-                          vertical: 'bottom',
-                          horizontal: 'left',
-                        },
-                        transformOrigin: {
-                          vertical: 'top',
-                          horizontal: 'left',
-                        },
-                      }}
+                      aria-label="Select drink types"
                     >
                       <MenuItem value="All Drink Types">All Drink Types</MenuItem>
                       <MenuItem value="beer">Beer</MenuItem>
@@ -456,7 +512,7 @@ export default function MapPage() {
                   </FormControl>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={4}>
+                <Grid item>
                   <FormControl fullWidth>
                     <InputLabel>Container</InputLabel>
                     <Select
@@ -465,25 +521,6 @@ export default function MapPage() {
                       onChange={(e) => handleFilterChange('container', e.target.value)}
                       label="Container"
                       renderValue={(selected) => selected.join(', ')}
-                      onOpen={(e) => handleFilterClick(e, 'container')}
-                      onClose={() => handleFilterClose('container')}
-                      MenuProps={{
-                        PaperProps: {
-                          style: {
-                            maxHeight: 300,
-                            width: 250,
-                          },
-                        },
-                        anchorEl: anchorEl.container,
-                        anchorOrigin: {
-                          vertical: 'bottom',
-                          horizontal: 'left',
-                        },
-                        transformOrigin: {
-                          vertical: 'top',
-                          horizontal: 'left',
-                        },
-                      }}
                     >
                       <MenuItem value="All Containers">All Containers</MenuItem>
                       {containerOptions.map(container => (
@@ -495,7 +532,7 @@ export default function MapPage() {
                   </FormControl>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={4}>
+                <Grid item>
                   <FormControl fullWidth>
                     <InputLabel>Brand</InputLabel>
                     <Select
@@ -504,25 +541,6 @@ export default function MapPage() {
                       onChange={(e) => handleFilterChange('brand', e.target.value)}
                       label="Brand"
                       renderValue={(selected) => selected.join(', ')}
-                      onOpen={(e) => handleFilterClick(e, 'brand')}
-                      onClose={() => handleFilterClose('brand')}
-                      MenuProps={{
-                        PaperProps: {
-                          style: {
-                            maxHeight: 300,
-                            width: 250,
-                          },
-                        },
-                        anchorEl: anchorEl.brand,
-                        anchorOrigin: {
-                          vertical: 'bottom',
-                          horizontal: 'left',
-                        },
-                        transformOrigin: {
-                          vertical: 'top',
-                          horizontal: 'left',
-                        },
-                      }}
                     >
                       <MenuItem value="All Brands">All Brands</MenuItem>
                       {brandOptions.map(brand => (
@@ -534,7 +552,7 @@ export default function MapPage() {
                   </FormControl>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={4}>
+                <Grid item>
                   <FormControl fullWidth>
                     <InputLabel>Method</InputLabel>
                     <Select
@@ -543,25 +561,6 @@ export default function MapPage() {
                       onChange={(e) => handleFilterChange('method', e.target.value)}
                       label="Method"
                       renderValue={(selected) => selected.join(', ')}
-                      onOpen={(e) => handleFilterClick(e, 'method')}
-                      onClose={() => handleFilterClose('method')}
-                      MenuProps={{
-                        PaperProps: {
-                          style: {
-                            maxHeight: 300,
-                            width: 250,
-                          },
-                        },
-                        anchorEl: anchorEl.method,
-                        anchorOrigin: {
-                          vertical: 'bottom',
-                          horizontal: 'left',
-                        },
-                        transformOrigin: {
-                          vertical: 'top',
-                          horizontal: 'left',
-                        },
-                      }}
                     >
                       <MenuItem value="All Methods">All Methods</MenuItem>
                       {methodOptions.map(method => (
@@ -573,7 +572,7 @@ export default function MapPage() {
                   </FormControl>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={4}>
+                <Grid item>
                   <FormControl fullWidth>
                     <InputLabel>Rating</InputLabel>
                     <Select
@@ -582,25 +581,6 @@ export default function MapPage() {
                       onChange={(e) => handleFilterChange('rating', e.target.value)}
                       label="Rating"
                       renderValue={(selected) => selected.join(', ')}
-                      onOpen={(e) => handleFilterClick(e, 'rating')}
-                      onClose={() => handleFilterClose('rating')}
-                      MenuProps={{
-                        PaperProps: {
-                          style: {
-                            maxHeight: 300,
-                            width: 250,
-                          },
-                        },
-                        anchorEl: anchorEl.rating,
-                        anchorOrigin: {
-                          vertical: 'bottom',
-                          horizontal: 'left',
-                        },
-                        transformOrigin: {
-                          vertical: 'top',
-                          horizontal: 'left',
-                        },
-                      }}
                     >
                       <MenuItem value="All Ratings">All Ratings</MenuItem>
                       {[1, 2, 3, 4, 5].map(rating => (
@@ -612,7 +592,7 @@ export default function MapPage() {
                   </FormControl>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={4}>
+                <Grid item>
                   <LocalizationProvider dateAdapter={AdapterDateFns}>
                     <DatePicker
                       label="Start Date"
@@ -623,7 +603,7 @@ export default function MapPage() {
                   </LocalizationProvider>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={4}>
+                <Grid item>
                   <LocalizationProvider dateAdapter={AdapterDateFns}>
                     <DatePicker
                       label="End Date"
@@ -634,7 +614,7 @@ export default function MapPage() {
                   </LocalizationProvider>
                 </Grid>
 
-                <Grid item xs={12} sm={6} md={4}>
+                <Grid item>
                   <FormControlLabel
                     control={
                       <Switch
@@ -657,52 +637,26 @@ export default function MapPage() {
                     }}
                   />
                 </Grid>
-
-                <Grid item xs={12}>
-                  <Box sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'flex-end', 
-                    gap: 1,
-                    mt: 2
-                  }}>
-                    <Button
-                      variant="outlined"
-                      startIcon={<ClearIcon />}
-                      onClick={clearFilters}
-                      disabled={activeFilters === 0}
-                      sx={{
-                        borderColor: 'var(--glass-border)',
-                        color: 'var(--text-primary)',
-                        backgroundColor: 'var(--glass-background)',
-                        '&:hover': {
-                          borderColor: 'var(--beer-amber)',
-                          color: 'var(--beer-amber)',
-                          backgroundColor: 'var(--glass-background)',
-                        },
-                        '&.Mui-disabled': {
-                          color: 'var(--text-secondary)',
-                        },
-                      }}
-                    >
-                      Clear Filters
-                    </Button>
-                  </Box>
-                </Grid>
               </FilterGrid>
             </FilterBar>
           </Collapse>
 
-          <Box sx={{ 
-            height: 'calc(100vh - 300px)',
-            width: '100%',
-            position: 'relative',
-            bgcolor: '#121212',
-            borderRadius: '12px',
-            overflow: 'hidden'
-          }}>
+          <Box 
+            sx={{ 
+              height: 'calc(100vh - 200px)',
+              width: '100%',
+              position: 'relative',
+              bgcolor: '#121212',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              transition: 'height 0.3s ease'
+            }}
+            role="application"
+            aria-label="Map showing drink locations"
+          >
             <MapWrapper
               drinks={filteredDrinks}
-              friendDrinks={showFriendLogs ? filteredFriendDrinks : []}
+              friendDrinks={filteredFriendDrinks}
               selectedDrink={selectedDrink}
               setSelectedDrink={setSelectedDrink}
               handleMouseMove={handleMouseMove}

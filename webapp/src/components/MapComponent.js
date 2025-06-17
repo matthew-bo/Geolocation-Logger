@@ -41,6 +41,7 @@ function MapComponent({
 }) {
   const mapRef = useRef(null);
   const [mapError, setMapError] = useState(null);
+  const [hoveredPointId, setHoveredPointId] = useState(null);
   const [viewport, setViewport] = useState({
     latitude: 40,
     longitude: -74.5,
@@ -156,9 +157,13 @@ function MapComponent({
         return;
       }
 
+      // Add extra zoom to make it easier to see individual beers
+      const targetZoom = Math.min(zoom + 1, 16);
+      
       mapRef.current.getMap().easeTo({
         center: feature.geometry.coordinates,
-        zoom: zoom
+        zoom: targetZoom,
+        duration: 1000
       });
     });
   };
@@ -171,6 +176,21 @@ function MapComponent({
     } else {
       setSelectedDrink(feature.properties.drink);
     }
+  };
+
+  // Handle mouse enter on markers
+  const onMouseEnter = (event) => {
+    const feature = event.features[0];
+    if (feature && !feature.properties.cluster) {
+      setHoveredPointId(feature.properties.id);
+      event.target.getCanvas().style.cursor = 'pointer';
+    }
+  };
+
+  // Handle mouse leave on markers
+  const onMouseLeave = (event) => {
+    setHoveredPointId(null);
+    event.target.getCanvas().style.cursor = '';
   };
 
   if (mapError) {
@@ -221,6 +241,8 @@ function MapComponent({
         }}
         interactiveLayerIds={['clusters', 'unclustered-point']}
         onClick={onMarkerClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       >
         <GeolocateControl 
           position={isMobile ? "bottom-right" : "top-right"}
@@ -236,8 +258,8 @@ function MapComponent({
           type="geojson"
           data={drinksGeoJSON}
           cluster={true}
-          clusterMaxZoom={14}
-          clusterRadius={50}
+          clusterMaxZoom={12}
+          clusterRadius={30}
         >
           {/* Clusters */}
           <Layer
@@ -298,9 +320,42 @@ function MapComponent({
                 '#4CAF50',  // Green for friends
                 '#FBC02D'   // Amber for user
               ],
-              'circle-radius': Math.max(8, Math.min(16, viewport.zoom * 1.5)),
+              'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                10, 12,  // At zoom 10, radius 12
+                14, 16,  // At zoom 14, radius 16
+                16, 20   // At zoom 16, radius 20
+              ],
               'circle-stroke-width': 2,
               'circle-stroke-color': '#fff'
+            }}
+          />
+          
+          {/* Hover effect for individual markers */}
+          <Layer
+            id="unclustered-point-hover"
+            type="circle"
+            filter={['!', ['has', 'point_count']]}
+            paint={{
+              'circle-color': [
+                'case',
+                ['==', ['get', 'type'], 'friend'],
+                '#4CAF50',  // Green for friends
+                '#FBC02D'   // Amber for user
+              ],
+              'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                10, 14,  // At zoom 10, radius 14 (slightly larger)
+                14, 18,  // At zoom 14, radius 18
+                16, 22   // At zoom 16, radius 22
+              ],
+              'circle-stroke-width': 3,
+              'circle-stroke-color': '#fff',
+              'circle-opacity': 0
             }}
           />
         </Source>

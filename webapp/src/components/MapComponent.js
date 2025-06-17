@@ -42,13 +42,6 @@ function MapComponent({
   const mapRef = useRef(null);
   const [mapError, setMapError] = useState(null);
   const [hoveredPointId, setHoveredPointId] = useState(null);
-  const [viewport, setViewport] = useState({
-    latitude: 40,
-    longitude: -74.5,
-    zoom: 9,
-    bearing: 0,
-    pitch: 0
-  });
   
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -109,42 +102,44 @@ function MapComponent({
     };
   }, [drinks, friendDrinks]);
 
+  // Calculate initial view state based on beers data
+  const initialViewState = useMemo(() => {
+    if (drinksGeoJSON.features.length === 0) {
+      // Default to a reasonable location if no beers
+      return {
+        latitude: 40,
+        longitude: -74.5,
+        zoom: 9,
+        bearing: 0,
+        pitch: 0
+      };
+    }
+
+    // Calculate bounds from all beers
+    const bounds = new mapboxgl.LngLatBounds();
+    drinksGeoJSON.features.forEach(feature => {
+      const [lng, lat] = feature.geometry.coordinates;
+      bounds.extend([lng, lat]);
+    });
+
+    // Get center and zoom from bounds
+    const center = bounds.getCenter();
+    const zoom = Math.min(12, Math.max(9, bounds.getZoom() - 1)); // Adjust zoom level
+
+    return {
+      latitude: center.lat,
+      longitude: center.lng,
+      zoom: zoom,
+      bearing: 0,
+      pitch: 0
+    };
+  }, [drinksGeoJSON]);
+
   useEffect(() => {
     if (!MAPBOX_TOKEN) {
       setMapError("Mapbox token not found. Please check your environment variables.");
     }
   }, []);
-
-  // Fit map to markers on load
-  useEffect(() => {
-    if (mapRef.current && drinksGeoJSON.features.length > 0) {
-      try {
-        const bounds = new mapboxgl.LngLatBounds();
-        let hasValidCoordinates = false;
-
-        drinksGeoJSON.features.forEach(feature => {
-          const [lng, lat] = feature.geometry.coordinates;
-          bounds.extend([lng, lat]);
-          hasValidCoordinates = true;
-        });
-
-        if (hasValidCoordinates && mapRef.current.getMap) {
-          mapRef.current.getMap().fitBounds(bounds, {
-            padding: {
-              top: isMobile ? 180 : 200,
-              bottom: 50,
-              left: 50,
-              right: 50
-            },
-            duration: 1000
-          });
-        }
-      } catch (error) {
-        console.error('Error setting map bounds:', error);
-        setMapError("Error loading map. Please try refreshing the page.");
-      }
-    }
-  }, [drinksGeoJSON, isMobile]);
 
   // Handle cluster click
   const onClusterClick = (event) => {
@@ -225,8 +220,7 @@ function MapComponent({
     >
       <Map
         ref={mapRef}
-        initialViewState={viewport}
-        onMove={evt => setViewport(evt.viewState)}
+        initialViewState={initialViewState}
         onMouseMove={handleMouseMove}
         mapStyle="mapbox://styles/mapbox/dark-v11"
         mapboxAccessToken={MAPBOX_TOKEN}
@@ -258,7 +252,7 @@ function MapComponent({
           type="geojson"
           data={drinksGeoJSON}
           cluster={true}
-          clusterMaxZoom={12}
+          clusterMaxZoom={9}
           clusterRadius={30}
         >
           {/* Clusters */}
@@ -324,9 +318,10 @@ function MapComponent({
                 'interpolate',
                 ['linear'],
                 ['zoom'],
-                10, 12,  // At zoom 10, radius 12
-                14, 16,  // At zoom 14, radius 16
-                16, 20   // At zoom 16, radius 20
+                9, 14,   // At zoom 9, radius 14
+                11, 18,  // At zoom 11, radius 18
+                13, 22,  // At zoom 13, radius 22
+                15, 26   // At zoom 15, radius 26
               ],
               'circle-stroke-width': 2,
               'circle-stroke-color': '#fff'
@@ -349,13 +344,19 @@ function MapComponent({
                 'interpolate',
                 ['linear'],
                 ['zoom'],
-                10, 14,  // At zoom 10, radius 14 (slightly larger)
-                14, 18,  // At zoom 14, radius 18
-                16, 22   // At zoom 16, radius 22
+                9, 16,   // At zoom 9, radius 16 (slightly larger)
+                11, 20,  // At zoom 11, radius 20
+                13, 24,  // At zoom 13, radius 24
+                15, 28   // At zoom 15, radius 28
               ],
               'circle-stroke-width': 3,
               'circle-stroke-color': '#fff',
-              'circle-opacity': 0
+              'circle-opacity': [
+                'case',
+                ['==', ['get', 'id'], hoveredPointId],
+                1,  // Show when hovered
+                0   // Hide when not hovered
+              ]
             }}
           />
         </Source>

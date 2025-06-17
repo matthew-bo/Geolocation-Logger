@@ -29,7 +29,9 @@ export default function Login() {
 
   // Check for resetPassword mode in URL and auto-open dialog
   useEffect(() => {
-    if (router.query.mode === 'resetPassword') {
+    // Only run this effect when router.query is available and mode is explicitly 'resetPassword'
+    if (router.isReady && router.query.mode === 'resetPassword') {
+      console.log('Auto-opening reset password dialog due to URL parameter');
       setResetPasswordOpen(true);
       // Clean up the URL by removing the mode parameter
       const { mode, ...queryParams } = router.query;
@@ -38,9 +40,15 @@ export default function Login() {
         query: queryParams
       }, undefined, { shallow: true });
     }
-  }, [router.query.mode, router]);
+  }, [router.isReady, router.query.mode, router]);
+
+  // Debug: Log when resetPasswordOpen state changes
+  useEffect(() => {
+    console.log('resetPasswordOpen state changed to:', resetPasswordOpen);
+  }, [resetPasswordOpen]);
 
   const onSubmit = async (data) => {
+    console.log('Login form submitted'); // Debug log
     setLoading(true);
     const result = await login(data.email, data.password);
     setLoading(false);

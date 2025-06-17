@@ -90,16 +90,17 @@ const containerTypes = [
 const FilterBar = styled(Box)(({ theme }) => ({
   position: 'relative',
   width: '100%',
-  backgroundColor: 'var(--glass-background)',
-  backdropFilter: 'blur(10px)',
+  backgroundColor: 'rgba(42, 39, 35, 0.95)',
+  backdropFilter: 'blur(15px)',
   padding: theme.spacing(3),
   borderRadius: theme.shape.borderRadius,
-  boxShadow: theme.shadows[4],
-  border: '1px solid var(--glass-border)',
+  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+  border: '2px solid rgba(251, 192, 45, 0.4)',
   marginBottom: theme.spacing(2),
   maxWidth: '800px',
   margin: '0 auto',
   color: 'var(--text-primary)',
+  zIndex: 10,
 }));
 
 const FilterGrid = styled(Grid)(({ theme }) => ({
@@ -130,14 +131,16 @@ const FilterToggleButton = styled(Button)(({ theme }) => ({
   marginBottom: theme.spacing(2),
   justifyContent: 'center',
   padding: theme.spacing(1, 2),
-  background: 'var(--glass-background)',
-  backdropFilter: 'blur(10px)',
-  border: '1px solid var(--glass-border)',
+  background: 'rgba(42, 39, 35, 0.95)',
+  backdropFilter: 'blur(15px)',
+  border: '2px solid rgba(251, 192, 45, 0.4)',
   borderRadius: '12px',
   color: 'var(--text-primary)',
+  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
   '&:hover': {
-    background: 'var(--glass-background)',
-    opacity: 0.9,
+    background: 'rgba(42, 39, 35, 0.98)',
+    border: '2px solid rgba(251, 192, 45, 0.6)',
+    boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4)',
   },
 }));
 

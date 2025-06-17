@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -21,6 +21,7 @@ export default function Login() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+  const hasHandledUrlParam = useRef(false);
   const {
     register,
     handleSubmit,
@@ -29,9 +30,12 @@ export default function Login() {
 
   // Check for resetPassword mode in URL and auto-open dialog
   useEffect(() => {
-    // Only run this effect when router.query is available and mode is explicitly 'resetPassword'
-    if (router.isReady && router.query.mode === 'resetPassword') {
+    console.log('useEffect triggered - router.isReady:', router.isReady, 'router.query:', router.query, 'hasHandledUrlParam:', hasHandledUrlParam.current);
+    
+    // Only run this effect once when router is ready and we haven't handled the URL param yet
+    if (router.isReady && !hasHandledUrlParam.current && router.query.mode === 'resetPassword') {
       console.log('Auto-opening reset password dialog due to URL parameter');
+      hasHandledUrlParam.current = true;
       setResetPasswordOpen(true);
       // Clean up the URL by removing the mode parameter
       const { mode, ...queryParams } = router.query;
@@ -39,6 +43,8 @@ export default function Login() {
         pathname: router.pathname,
         query: queryParams
       }, undefined, { shallow: true });
+    } else {
+      console.log('Not opening reset password dialog - conditions not met');
     }
   }, [router.isReady, router.query.mode, router]);
 
@@ -50,6 +56,12 @@ export default function Login() {
   const onSubmit = async (data) => {
     console.log('Login form submitted'); // Debug log
     setLoading(true);
+    
+    // Prevent reset password dialog from opening during login
+    if (resetPasswordOpen) {
+      setResetPasswordOpen(false);
+    }
+    
     const result = await login(data.email, data.password);
     setLoading(false);
 

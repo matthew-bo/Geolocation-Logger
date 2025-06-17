@@ -90,14 +90,16 @@ const containerTypes = [
 const FilterBar = styled(Box)(({ theme }) => ({
   position: 'relative',
   width: '100%',
-  backgroundColor: 'var(--background)',
+  backgroundColor: 'var(--glass-background)',
+  backdropFilter: 'blur(10px)',
   padding: theme.spacing(3),
   borderRadius: theme.shape.borderRadius,
   boxShadow: theme.shadows[4],
-  border: '1px solid var(--border-color)',
+  border: '1px solid var(--glass-border)',
   marginBottom: theme.spacing(2),
   maxWidth: '800px',
   margin: '0 auto',
+  color: 'var(--text-primary)',
 }));
 
 const FilterGrid = styled(Grid)(({ theme }) => ({
@@ -466,7 +468,7 @@ export default function MapPage() {
                 alignItems: 'center', 
                 mb: 3, 
                 gap: 2,
-                borderBottom: '1px solid var(--border-color)',
+                borderBottom: '1px solid var(--glass-border)',
                 pb: 2
               }}>
                 <Typography variant="h6" sx={{ flex: 1 }}>Map Filters</Typography>
@@ -643,7 +645,7 @@ export default function MapPage() {
 
           <Box 
             sx={{ 
-              height: 'calc(100vh - 200px)',
+              height: showFilters ? 'calc(100vh - 400px)' : 'calc(100vh - 200px)',
               width: '100%',
               position: 'relative',
               bgcolor: '#121212',

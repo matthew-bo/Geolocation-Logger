@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -26,6 +26,19 @@ export default function Login() {
     handleSubmit,
     formState: { errors },
   } = useForm();
+
+  // Check for resetPassword mode in URL and auto-open dialog
+  useEffect(() => {
+    if (router.query.mode === 'resetPassword') {
+      setResetPasswordOpen(true);
+      // Clean up the URL by removing the mode parameter
+      const { mode, ...queryParams } = router.query;
+      router.replace({
+        pathname: router.pathname,
+        query: queryParams
+      }, undefined, { shallow: true });
+    }
+  }, [router.query.mode, router]);
 
   const onSubmit = async (data) => {
     setLoading(true);

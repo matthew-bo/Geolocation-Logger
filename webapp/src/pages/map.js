@@ -157,7 +157,6 @@ export default function MapPage() {
   const [containerOptions, setContainerOptions] = useState([]);
   const [methodOptions, setMethodOptions] = useState([]);
   const [filters, setFilters] = useState({
-    drinkType: ['All Drink Types'],
     container: ['All Containers'],
     brand: ['All Brands'],
     rating: ['All Ratings'],
@@ -173,7 +172,6 @@ export default function MapPage() {
   const [filteredBrandOptions, setFilteredBrandOptions] = useState([]);
   const [showFriendLogs, setShowFriendLogs] = useState(true);
   const [anchorEl, setAnchorEl] = useState({
-    drinkType: null,
     container: null,
     brand: null,
     method: null,
@@ -181,7 +179,6 @@ export default function MapPage() {
   });
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [dateRange, setDateRange] = useState([0, 100]);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -219,26 +216,30 @@ export default function MapPage() {
         const friendsSnapshot = await getDocs(friendsQuery);
         friendsDrinks = friendsSnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          timestamp: doc.data().timestamp?.toDate()
         }));
       }
       setFriendDrinks(friendsDrinks);
 
-      if (drinksData.length > 0) {
-        const uniqueBrands = [...new Set(drinksData
+      // Combine user and friend drinks for filter options
+      const allDrinks = [...drinksData, ...friendsDrinks];
+      
+      if (allDrinks.length > 0) {
+        const uniqueBrands = [...new Set(allDrinks
           .map(drink => drink.brand)
           .filter(brand => brand && brand.trim() !== '')
         )].sort();
         setBrandOptions(uniqueBrands);
         setFilteredBrandOptions(uniqueBrands);
 
-        const uniqueContainers = [...new Set(drinksData
+        const uniqueContainers = [...new Set(allDrinks
           .map(drink => drink.containerType)
           .filter(container => container && container.trim() !== '')
         )].sort();
         setContainerOptions(uniqueContainers);
 
-        const uniqueMethods = [...new Set(drinksData
+        const uniqueMethods = [...new Set(allDrinks
           .map(drink => drink.method)
           .filter(method => method && method.trim() !== '')
         )].sort();
@@ -292,12 +293,10 @@ export default function MapPage() {
   };
 
   const confirmClearFilters = () => {
-    setDateRange([0, 100]);
     setShowClearConfirm(false);
     setSuccessMessage('Filters cleared successfully');
     setShowSuccess(true);
     setFilters({
-      drinkType: ['All Drink Types'],
       container: ['All Containers'],
       brand: ['All Brands'],
       rating: ['All Ratings'],
@@ -335,56 +334,129 @@ export default function MapPage() {
     setFilteredBrandOptions(filtered);
   };
 
+  // Calculate active filters count
+  const calculateActiveFilters = useMemo(() => {
+    let count = 0;
+    
+    // Count non-default filter selections
+    if (!filters.container.includes('All Containers') || filters.container.length > 1) count++;
+    if (!filters.brand.includes('All Brands') || filters.brand.length > 1) count++;
+    if (!filters.rating.includes('All Ratings') || filters.rating.length > 1) count++;
+    if (!filters.method.includes('All Methods') || filters.method.length > 1) count++;
+    if (filters.startDate) count++;
+    if (filters.endDate) count++;
+    
+    console.log('🔍 Active filters count:', count, 'Filters:', filters);
+    return count;
+  }, [filters]);
+
+  // Update active filters count
+  useEffect(() => {
+    setActiveFilters(calculateActiveFilters);
+  }, [calculateActiveFilters]);
+
   // Memoize filtered results
   const filteredDrinks = useMemo(() => {
     const filterSet = {
-      drinkType: new Set(filters.drinkType),
       container: new Set(filters.container),
       brand: new Set(filters.brand),
       rating: new Set(filters.rating),
       method: new Set(filters.method)
     };
 
-    return drinks.filter(drink => {
-      return (
-        (filterSet.drinkType.has('All Drink Types') || filterSet.drinkType.has(drink.type)) &&
-        (filterSet.container.has('All Containers') || filterSet.container.has(drink.containerType)) &&
-        (filterSet.brand.has('All Brands') || filterSet.brand.has(drink.brand)) &&
-        (filterSet.rating.has('All Ratings') || filterSet.rating.has(drink.rating)) &&
-        (filterSet.method.has('All Methods') || filterSet.method.has(drink.method)) &&
-        (!filters.startDate || new Date(drink.timestamp.toDate()) >= filters.startDate) &&
-        (!filters.endDate || new Date(drink.timestamp.toDate()) <= filters.endDate)
+    const filtered = drinks.filter(drink => {
+      // Helper function to check if a drink matches the filter
+      const matchesFilter = (filterValues, drinkValue, allValue) => {
+        // If "All" is selected, always include
+        if (filterValues.has(allValue)) return true;
+        
+        // If no specific values selected, don't include
+        if (filterValues.size === 0) return false;
+        
+        // Handle null/undefined drink values
+        if (drinkValue === null || drinkValue === undefined || drinkValue === '') {
+          return false;
+        }
+        
+        // Check if drink value matches any selected filter values
+        return filterValues.has(drinkValue);
+      };
+
+      // Check each filter
+      const matchesContainer = matchesFilter(filterSet.container, drink.containerType, 'All Containers');
+      const matchesBrand = matchesFilter(filterSet.brand, drink.brand, 'All Brands');
+      const matchesMethod = matchesFilter(filterSet.method, drink.method, 'All Methods');
+      
+      // Special handling for rating (convert to string for comparison)
+      const matchesRating = matchesFilter(
+        new Set(filters.rating.map(r => r.toString())), 
+        drink.rating?.toString(), 
+        'All Ratings'
       );
+
+      // Date filtering
+      const drinkDate = drink.timestamp instanceof Date ? drink.timestamp : new Date(drink.timestamp);
+      const matchesStartDate = !filters.startDate || drinkDate >= filters.startDate;
+      const matchesEndDate = !filters.endDate || drinkDate <= filters.endDate;
+
+      return matchesContainer && matchesBrand && matchesRating && matchesMethod && matchesStartDate && matchesEndDate;
     });
+
+    console.log('🍺 User drinks filtered:', filtered.length, 'of', drinks.length, 'total');
+    return filtered;
   }, [drinks, filters]);
 
   const filteredFriendDrinks = useMemo(() => {
     if (!showFriendLogs) return [];
     
     const filterSet = {
-      drinkType: new Set(filters.drinkType),
       container: new Set(filters.container),
       brand: new Set(filters.brand),
       rating: new Set(filters.rating),
       method: new Set(filters.method)
     };
 
-    return friendDrinks.filter(drink => {
-      return (
-        (filterSet.drinkType.has('All Drink Types') || filterSet.drinkType.has(drink.type)) &&
-        (filterSet.container.has('All Containers') || filterSet.container.has(drink.containerType)) &&
-        (filterSet.brand.has('All Brands') || filterSet.brand.has(drink.brand)) &&
-        (filterSet.rating.has('All Ratings') || filterSet.rating.has(drink.rating)) &&
-        (filterSet.method.has('All Methods') || filterSet.method.has(drink.method)) &&
-        (!filters.startDate || new Date(drink.timestamp) >= filters.startDate) &&
-        (!filters.endDate || new Date(drink.timestamp) <= filters.endDate)
-      );
-    });
-  }, [friendDrinks, filters, showFriendLogs]);
+    const filtered = friendDrinks.filter(drink => {
+      // Helper function to check if a drink matches the filter
+      const matchesFilter = (filterValues, drinkValue, allValue) => {
+        // If "All" is selected, always include
+        if (filterValues.has(allValue)) return true;
+        
+        // If no specific values selected, don't include
+        if (filterValues.size === 0) return false;
+        
+        // Handle null/undefined drink values
+        if (drinkValue === null || drinkValue === undefined || drinkValue === '') {
+          return false;
+        }
+        
+        // Check if drink value matches any selected filter values
+        return filterValues.has(drinkValue);
+      };
 
-  const handleDateRangeChange = (event, newValue) => {
-    setDateRange(newValue);
-  };
+      // Check each filter
+      const matchesContainer = matchesFilter(filterSet.container, drink.containerType, 'All Containers');
+      const matchesBrand = matchesFilter(filterSet.brand, drink.brand, 'All Brands');
+      const matchesMethod = matchesFilter(filterSet.method, drink.method, 'All Methods');
+      
+      // Special handling for rating (convert to string for comparison)
+      const matchesRating = matchesFilter(
+        new Set(filters.rating.map(r => r.toString())), 
+        drink.rating?.toString(), 
+        'All Ratings'
+      );
+
+      // Date filtering (consistent with user drinks)
+      const drinkDate = drink.timestamp instanceof Date ? drink.timestamp : new Date(drink.timestamp);
+      const matchesStartDate = !filters.startDate || drinkDate >= filters.startDate;
+      const matchesEndDate = !filters.endDate || drinkDate <= filters.endDate;
+
+      return matchesContainer && matchesBrand && matchesRating && matchesMethod && matchesStartDate && matchesEndDate;
+    });
+
+    console.log('👥 Friend drinks filtered:', filtered.length, 'of', friendDrinks.length, 'total');
+    return filtered;
+  }, [friendDrinks, filters, showFriendLogs]);
 
   if (loading) {
     return (
@@ -499,27 +571,6 @@ export default function MapPage() {
               </Box>
 
               <FilterGrid>
-                <Grid item>
-                  <FormControl fullWidth>
-                    <InputLabel id="drink-type-label">Drink Type</InputLabel>
-                    <Select
-                      labelId="drink-type-label"
-                      multiple
-                      value={filters.drinkType}
-                      onChange={(e) => handleFilterChange('drinkType', e.target.value)}
-                      label="Drink Type"
-                      renderValue={(selected) => selected.join(', ')}
-                      aria-label="Select drink types"
-                    >
-                      <MenuItem value="All Drink Types">All Drink Types</MenuItem>
-                      <MenuItem value="beer">Beer</MenuItem>
-                      <MenuItem value="wine">Wine</MenuItem>
-                      <MenuItem value="spirits">Spirits</MenuItem>
-                      <MenuItem value="cocktail">Cocktail</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-
                 <Grid item>
                   <FormControl fullWidth>
                     <InputLabel>Container</InputLabel>

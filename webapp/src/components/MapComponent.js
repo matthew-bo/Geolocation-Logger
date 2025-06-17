@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Map, { 
   Marker, 
   Popup, 
   NavigationControl, 
   ScaleControl,
   FullscreenControl,
-  GeolocateControl
+  GeolocateControl,
+  Source,
+  Layer
 } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import mapboxgl from 'mapbox-gl';
@@ -52,6 +54,60 @@ function MapComponent({
   const router = useRouter();
   const { user } = useAuth();
 
+  // Convert drinks to GeoJSON format for clustering
+  const drinksGeoJSON = useMemo(() => {
+    const features = [];
+    
+    // Add user drinks
+    drinks.forEach(drink => {
+      if (drink.location && 
+          drink.location.lat && 
+          !isNaN(drink.location.lat) && 
+          drink.location.lng && 
+          !isNaN(drink.location.lng)) {
+        features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [Number(drink.location.lng), Number(drink.location.lat)]
+          },
+          properties: {
+            id: drink.id,
+            type: 'user',
+            drink: drink
+          }
+        });
+      }
+    });
+
+    // Add friend drinks
+    friendDrinks.forEach(drink => {
+      if (drink.location && 
+          drink.location.lat && 
+          !isNaN(drink.location.lat) && 
+          drink.location.lng && 
+          !isNaN(drink.location.lng)) {
+        features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [Number(drink.location.lng), Number(drink.location.lat)]
+          },
+          properties: {
+            id: drink.id,
+            type: 'friend',
+            drink: drink
+          }
+        });
+      }
+    });
+
+    return {
+      type: 'FeatureCollection',
+      features: features
+    };
+  }, [drinks, friendDrinks]);
+
   useEffect(() => {
     if (!MAPBOX_TOKEN) {
       setMapError("Mapbox token not found. Please check your environment variables.");
@@ -60,20 +116,15 @@ function MapComponent({
 
   // Fit map to markers on load
   useEffect(() => {
-    if (mapRef.current && drinks.length > 0) {
+    if (mapRef.current && drinksGeoJSON.features.length > 0) {
       try {
         const bounds = new mapboxgl.LngLatBounds();
         let hasValidCoordinates = false;
 
-        [...drinks, ...friendDrinks].forEach(drink => {
-          if (drink.location && 
-              drink.location.lat && 
-              !isNaN(drink.location.lat) && 
-              drink.location.lng && 
-              !isNaN(drink.location.lng)) {
-            bounds.extend([drink.location.lng, drink.location.lat]);
-            hasValidCoordinates = true;
-          }
+        drinksGeoJSON.features.forEach(feature => {
+          const [lng, lat] = feature.geometry.coordinates;
+          bounds.extend([lng, lat]);
+          hasValidCoordinates = true;
         });
 
         if (hasValidCoordinates && mapRef.current.getMap) {
@@ -92,7 +143,35 @@ function MapComponent({
         setMapError("Error loading map. Please try refreshing the page.");
       }
     }
-  }, [drinks, friendDrinks, isMobile]);
+  }, [drinksGeoJSON, isMobile]);
+
+  // Handle cluster click
+  const onClusterClick = (event) => {
+    const feature = event.features[0];
+    const clusterId = feature.properties.cluster_id;
+    const mapboxSource = mapRef.current.getMap().getSource('drinks');
+    
+    mapboxSource.getClusterExpansionZoom(clusterId, (err, zoom) => {
+      if (err) {
+        return;
+      }
+
+      mapRef.current.getMap().easeTo({
+        center: feature.geometry.coordinates,
+        zoom: zoom
+      });
+    });
+  };
+
+  // Handle individual marker click
+  const onMarkerClick = (event) => {
+    const feature = event.features[0];
+    if (feature.properties.cluster) {
+      onClusterClick(event);
+    } else {
+      setSelectedDrink(feature.properties.drink);
+    }
+  };
 
   if (mapError) {
     return (
@@ -140,6 +219,8 @@ function MapComponent({
           console.error('Map error:', e);
           setMapError("Error loading map. Please try refreshing the page.");
         }}
+        interactiveLayerIds={['clusters', 'unclustered-point']}
+        onClick={onMarkerClick}
       >
         <GeolocateControl 
           position={isMobile ? "bottom-right" : "top-right"}
@@ -150,92 +231,81 @@ function MapComponent({
         <NavigationControl position={isMobile ? "bottom-right" : "top-right"} />
         <ScaleControl position="bottom-right" />
         
-        {drinks.map((drink) => (
-          drink.location && 
-          drink.location.lat && 
-          !isNaN(drink.location.lat) && 
-          drink.location.lng && 
-          !isNaN(drink.location.lng) ? (
-            <Marker
-              key={drink.id}
-              latitude={Number(drink.location.lat)}
-              longitude={Number(drink.location.lng)}
-              onClick={(e) => {
-                e.originalEvent.stopPropagation();
-                setSelectedDrink(drink);
-              }}
-            >
-              <Box
-                sx={{
-                  width: getMarkerSize(viewport.zoom),
-                  height: getMarkerSize(viewport.zoom),
-                  backgroundColor: `${getMarkerColor(drink)}80`,
-                  border: `2px solid ${getMarkerColor(drink)}`,
-                  borderRadius: '50%',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    backgroundColor: getMarkerColor(drink),
-                    transform: 'scale(1.1)',
-                    boxShadow: `0 0 10px ${getMarkerColor(drink)}80`,
-                  },
-                }}
-              >
-                <DrinkIcon sx={{ 
-                  color: 'white',
-                  fontSize: getMarkerSize(viewport.zoom) * 0.6 
-                }} />
-              </Box>
-            </Marker>
-          ) : null
-        ))}
+        <Source
+          id="drinks"
+          type="geojson"
+          data={drinksGeoJSON}
+          cluster={true}
+          clusterMaxZoom={14}
+          clusterRadius={50}
+        >
+          {/* Clusters */}
+          <Layer
+            id="clusters"
+            type="circle"
+            filter={['has', 'point_count']}
+            paint={{
+              'circle-color': [
+                'step',
+                ['get', 'point_count'],
+                '#FBC02D',  // Default color
+                10,
+                '#FF9800',  // Orange for 10+ beers
+                50,
+                '#F44336'   // Red for 50+ beers
+              ],
+              'circle-radius': [
+                'step',
+                ['get', 'point_count'],
+                20,  // Default size
+                10,
+                25,  // Larger for 10+ beers
+                50,
+                30   // Even larger for 50+ beers
+              ],
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#fff'
+            }}
+          />
+          
+          {/* Cluster count labels */}
+          <Layer
+            id="cluster-count"
+            type="symbol"
+            filter={['has', 'point_count']}
+            layout={{
+              'text-field': '{point_count_abbreviated}',
+              'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+              'text-size': 12,
+              'text-allow-overlap': true
+            }}
+            paint={{
+              'text-color': '#000',
+              'text-halo-color': '#fff',
+              'text-halo-width': 1
+            }}
+          />
+          
+          {/* Individual markers (unclustered) */}
+          <Layer
+            id="unclustered-point"
+            type="circle"
+            filter={['!', ['has', 'point_count']]}
+            paint={{
+              'circle-color': [
+                'case',
+                ['==', ['get', 'type'], 'friend'],
+                '#4CAF50',  // Green for friends
+                '#FBC02D'   // Amber for user
+              ],
+              'circle-radius': Math.max(8, Math.min(16, viewport.zoom * 1.5)),
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#fff'
+            }}
+          />
+        </Source>
 
-        {friendDrinks.map((drink) => (
-          drink.location && 
-          drink.location.lat && 
-          !isNaN(drink.location.lat) && 
-          drink.location.lng && 
-          !isNaN(drink.location.lng) ? (
-            <Marker
-              key={drink.id}
-              latitude={Number(drink.location.lat)}
-              longitude={Number(drink.location.lng)}
-              onClick={(e) => {
-                e.originalEvent.stopPropagation();
-                setSelectedDrink(drink);
-              }}
-            >
-              <Box
-                sx={{
-                  width: getMarkerSize(viewport.zoom),
-                  height: getMarkerSize(viewport.zoom),
-                  backgroundColor: `${getMarkerColor(drink, 'friend')}80`,
-                  border: `2px solid ${getMarkerColor(drink, 'friend')}`,
-                  borderRadius: '50%',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    backgroundColor: getMarkerColor(drink, 'friend'),
-                    transform: 'scale(1.1)',
-                    boxShadow: `0 0 10px ${getMarkerColor(drink, 'friend')}80`,
-                  },
-                }}
-              >
-                <PersonIcon sx={{ 
-                  color: 'white',
-                  fontSize: getMarkerSize(viewport.zoom) * 0.6 
-                }} />
-              </Box>
-            </Marker>
-          ) : null
-        ))}
-
+        {/* Popup for selected drink */}
         {selectedDrink && selectedDrink.location && (
           <Popup
             latitude={Number(selectedDrink.location.lat)}

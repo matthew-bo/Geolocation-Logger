@@ -122,9 +122,23 @@ function MapComponent({
       bounds.extend([lng, lat]);
     });
 
-    // Get center and zoom from bounds
+    // Get center from bounds
     const center = bounds.getCenter();
-    const zoom = Math.min(12, Math.max(9, bounds.getZoom() - 1)); // Adjust zoom level
+    
+    // Calculate appropriate zoom level based on bounds
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+    const latDiff = ne.lat - sw.lat;
+    const lngDiff = ne.lng - sw.lng;
+    const maxDiff = Math.max(latDiff, lngDiff);
+    
+    // Calculate zoom level based on the maximum difference
+    // This is a simplified calculation - you might want to fine-tune these values
+    let zoom = 9; // Default zoom
+    if (maxDiff > 0) {
+      zoom = Math.floor(Math.log2(360 / maxDiff)) - 1;
+      zoom = Math.min(12, Math.max(9, zoom)); // Clamp between 9 and 12
+    }
 
     return {
       latitude: center.lat,
@@ -145,17 +159,31 @@ function MapComponent({
   const onClusterClick = (event) => {
     const feature = event.features[0];
     const clusterId = feature.properties.cluster_id;
-    const mapboxSource = mapRef.current.getMap().getSource('drinks');
+    
+    // Check if map and source are available
+    if (!mapRef.current || !mapRef.current.getMap()) {
+      console.warn('Map not available for cluster click');
+      return;
+    }
+    
+    const map = mapRef.current.getMap();
+    const mapboxSource = map.getSource('drinks');
+    
+    if (!mapboxSource) {
+      console.warn('Drinks source not available for cluster click');
+      return;
+    }
     
     mapboxSource.getClusterExpansionZoom(clusterId, (err, zoom) => {
       if (err) {
+        console.error('Error getting cluster expansion zoom:', err);
         return;
       }
 
       // Add extra zoom to make it easier to see individual beers
       const targetZoom = Math.min(zoom + 1, 16);
       
-      mapRef.current.getMap().easeTo({
+      map.easeTo({
         center: feature.geometry.coordinates,
         zoom: targetZoom,
         duration: 1000
@@ -165,6 +193,10 @@ function MapComponent({
 
   // Handle individual marker click
   const onMarkerClick = (event) => {
+    if (!event.features || event.features.length === 0) {
+      return;
+    }
+    
     const feature = event.features[0];
     if (feature.properties.cluster) {
       onClusterClick(event);
@@ -175,17 +207,25 @@ function MapComponent({
 
   // Handle mouse enter on markers
   const onMouseEnter = (event) => {
+    if (!event.features || event.features.length === 0) {
+      return;
+    }
+    
     const feature = event.features[0];
     if (feature && !feature.properties.cluster) {
       setHoveredPointId(feature.properties.id);
-      event.target.getCanvas().style.cursor = 'pointer';
+      if (event.target && event.target.getCanvas) {
+        event.target.getCanvas().style.cursor = 'pointer';
+      }
     }
   };
 
   // Handle mouse leave on markers
   const onMouseLeave = (event) => {
     setHoveredPointId(null);
-    event.target.getCanvas().style.cursor = '';
+    if (event.target && event.target.getCanvas) {
+      event.target.getCanvas().style.cursor = '';
+    }
   };
 
   if (mapError) {

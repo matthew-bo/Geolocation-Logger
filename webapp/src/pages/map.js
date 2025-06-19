@@ -145,9 +145,6 @@ const FilterToggleButton = styled(Button)(({ theme }) => ({
 }));
 
 export default function MapPage() {
-  console.log('🚨 MAP PAGE LOADED - NEW VERSION DEPLOYED! 🚨');
-  console.log('If you see this message, the new code is running!');
-  
   const { user } = useAuth();
   const [drinks, setDrinks] = useState([]);
   const [friendDrinks, setFriendDrinks] = useState([]);

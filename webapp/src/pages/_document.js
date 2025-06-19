@@ -6,7 +6,8 @@ export default function Document() {
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <meta name="theme-color" content="#252525" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" type="image/svg+xml" href="/hops.svg" />
+        <link rel="alternate icon" href="/hops.svg" />
       </Head>
       <body>
         <Main />

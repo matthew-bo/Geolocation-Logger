@@ -70,7 +70,7 @@ export default function ResetPasswordDialog({ open, onClose }) {
     try {
       // Configure actionCodeSettings for password reset
       const actionCodeSettings = {
-        url: `https://www.ihadabeer.com/login?mode=resetPassword`,
+        url: `https://geolocation-c8fa1.web.app/login?mode=resetPassword`,
         handleCodeInApp: false, // Set to false to use Firebase's hosted page
       };
 
